@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { LuminousCrystalWorld } from './presentation.js';
-import { RULES } from './physics.js';
+import { RULES,clamp } from './physics.js';
 import { wallMaterial } from './crystal-material.js';
 import { crystalEnvironment,opticalCrystal,gemGeometry } from './gem-optics.js';
 import { emblem } from './icons-3d.js';
@@ -95,7 +95,7 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     this.holdMaterial.color.set(g.readyReason==='capture'?0xd2a0ff:0x87fff2);
     this.heldCue.rotation.z=t*.4;
     this.bindGems.forEach((m,i)=>{m.visible=i<g.effects.bind;});
-    const grow=g.shieldRadius/RULES.shieldRadius,hit=Math.max(0,1-(t-g.lastShieldAt)/.22);
+    const grow=g.shieldRadius/RULES.shieldRadius,hit=clamp(1-(t-g.lastShieldAt)/.22,0,1);
     this.shield.scale.set(grow*(1+.05*hit),grow*(1+.05*hit),1-.18*hit);
     this.launchGlyph.scale.setScalar(.39*(1+Math.sin(t*3)*.12));
     this.bubbles.forEach((root,i)=>{

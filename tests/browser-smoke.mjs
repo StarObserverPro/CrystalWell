@@ -83,7 +83,8 @@ try{
   assert.equal(metrics.capture.reason,'capture');assert.equal(metrics.capture.cue,true);assert.equal(metrics.capture.launchGlyph,true);
   await page.waitForTimeout(150);await shot('dragon-held');
   metrics.heldViews=[];
-  for (const time of [0,60,120,180]) {
+  // Advance beyond the capture timestamp; do not reverse the impact animation clock.
+  for (const time of [240,300,360,420]) {
     const reading=await page.evaluate(time=>{
       const q=window.__crystalWell;q.game.time=time;q.refresh();q.drawFrame();
       const V=q.topCamera.position.constructor,p=q.world.heldCore.getWorldPosition(new V()).project(q.topCamera);
@@ -94,7 +95,7 @@ try{
     },time);
     metrics.heldViews.push(reading);assert.equal(reading.above&&reading.visible,true);
     assert.ok(reading.rgba[0]>reading.rgba[1]+10&&reading.rgba[2]>reading.rgba[1]+10,'purple held beacon remains readable through the shield');
-    if(time===120)await shot('held-back');
+    if(time===360)await shot('held-back');
   }
   await page.evaluate(()=>{const q=window.__crystalWell;q.game.time=240.65;q.game.heldSince=240.2;q.refresh();});
   await shot('dragon-front');
