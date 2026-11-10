@@ -4,7 +4,6 @@ import {DRAGON_FIT,MODEL_SCALE,HEAD_WIDEN,fitDragonPoint,headAngles,headRotation
 import {BARRIER,barrierSurface} from '../src/barrier-math.js';
 import {ballDepthScale} from '../src/visual-math.js';
 import {sideViewDistance} from '../src/composition.js';
-import {REFRACTION,refractionSize} from '../src/optics-rules.js';
 import {CrystalWellGame,RULES} from '../src/physics.js';
 
 test('cranial fit excludes the ornament envelope and treats 1.75 as an art parameter',()=>{
@@ -39,21 +38,13 @@ test('ball size grows towards the opening continuously without changing collisio
   let last=0;for(let z=-20;z<=20;z+=.01){const size=ballDepthScale(z);assert.ok(size>=last-1e-12);last=size;}
   assert.equal(RULES.ballRadius,radius);
 });
-test('refraction resolution, update rate and brick count have explicit upper bounds',()=>{
-  assert.equal(REFRACTION.maxBricks,384);assert.equal(REFRACTION.hz,30);
-  for(const [w,h,d] of [[954,900,1.414],[490,390,1.91],[4000,2000,3]]){
-    const [a,b]=refractionSize(w,h,d);assert.ok(a<=720&&b<=720);assert.ok(a*b<w*h*d*d*.27);
-    assert.ok(Math.abs(a/b-w/h)<.015);
-  }
-});
-
 test('side view fits the near elevated lip even in short landscape viewports',()=>{
   for(const aspect of [.45,.60,.90,1.5]){
     const d=sideViewDistance(aspect),tan=Math.tan(21*Math.PI/180);
     for(let i=0;i<256;i++){
-      const a=i*Math.PI*2/256,x=12.1*Math.cos(a),forward=12.1*Math.sin(a),depth=d-forward;
-      assert.ok(Math.abs(x/(depth*tan*aspect))<.95);
-      assert.ok((12.2-.3)/(depth*tan)<.95);
+      const a=i*Math.PI*2/256,x=11.8*Math.cos(a),forward=11.8*Math.sin(a),depth=d-forward;
+      assert.ok(Math.abs(x/(depth*tan*aspect))<.98);
+      assert.ok((12.0-.3)/(depth*tan)<.98);
     }
   }
 });

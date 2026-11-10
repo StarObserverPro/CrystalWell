@@ -43,7 +43,7 @@ try{
     draws:q.renderer.info.render.calls,triangles:q.renderer.info.render.triangles,crystals:q.world.crystals.count,
     sideCrystals:q.world.sideCrystals.count,pixelRatio:q.renderer.getPixelRatio(),fps:document.querySelector('#fps-readout').textContent,
     lives:q.game.lives,lines,score:q.hud.score.value,heldCue:q.world.heldCue.visible};});
-  assert.equal(await page.evaluate(()=>window.__crystalWell.world.rim.children.length),26);
+  assert.equal(await page.evaluate(()=>window.__crystalWell.world.rim.children.length),10);
   assert.equal(await page.evaluate(()=>window.__crystalWell.world.dragon.userData.ready),true);
   assert.match(await page.evaluate(()=>window.__crystalWell.world.dragon.userData.source),/Grab3D/);
   assert.equal(metrics.desktop.lives,3);assert.equal(metrics.desktop.lines,0);assert.equal(metrics.desktop.heldCue,true);
@@ -54,15 +54,16 @@ try{
   assert.equal(await page.evaluate(()=>[...document.querySelectorAll('button')].every(b=>b.children.length===0&&getComputedStyle(b).borderWidth==='0px')),true);
   assert.equal(await page.evaluate(()=>{const q=window.__crystalWell,V=q.topCamera.position.constructor;
     for(let i=0;i<128;i++){const a=i*Math.PI*2/128,p=new V(Math.cos(a)*11.65,Math.sin(a)*11.65,11.7).project(q.topCamera);if(Math.abs(p.x)>.98||Math.abs(p.y)>.98)return false;}return true;}),true,'Expanded coping fits main view');
-  metrics.optics=await page.evaluate(()=>{const q=window.__crystalWell;
-    q.refraction.invalidate();q.drawFrame();const gl=q.renderer.getContext(),w=q.renderer.domElement.width,h=q.renderer.domElement.height;
-    const before=new Uint8Array(w*h*4),after=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,before);
-    q.refraction.enabled=false;q.drawFrame();gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,after);
-    let difference=0;for(let i=0;i<before.length;i+=4)if(Math.abs(before[i]-after[i])+Math.abs(before[i+1]-after[i+1])+Math.abs(before[i+2]-after[i+2])>9)difference++;
-    q.refraction.enabled=true;q.refraction.invalidate();
-    return {difference,width:q.refraction.target.width,height:q.refraction.target.height,count:q.world.crystals.userData.opticalCount,captures:q.refraction.captures};});
-  assert.ok(metrics.optics.count>0&&metrics.optics.count<=384);assert.ok(metrics.optics.width<=720&&metrics.optics.height<=720);
-  assert.ok(metrics.optics.difference>100,'Refraction must change rendered pixels, not just a toggle flag');
+  metrics.optimization=await page.evaluate(()=>{const q=__crystalWell;let transmitting=0;
+    q.world.scene.traverse(o=>{if(o.isMesh&&(o.material?.transmission||0)>0)transmitting++;});
+    return {transmitting,hasRefraction:!!q.refraction,visible:q.world.crystals.count,logical:q.game.remaining,
+      seaRadius:q.world.sea.mesh.userData.visualRadius,collisionRadius:q.world.sea.mesh.userData.collisionRadius,
+      matte:q.world.dragon.userData.model.children.every(o=>o.material.userData.matteBody)};});
+  assert.equal(metrics.optimization.transmitting,0,'No hidden transmission prepass');
+  assert.equal(metrics.optimization.hasRefraction,false,'No refraction target, sampler or capture');
+  assert.ok(metrics.optimization.visible<metrics.optimization.logical,'Buried crystals do not consume drawing budget');
+  assert.ok(metrics.optimization.seaRadius>200);assert.equal(metrics.optimization.collisionRadius,9.72);
+  assert.equal(metrics.optimization.matte,true);
   metrics.ballDepth=await page.evaluate(()=>{const q=window.__crystalWell,g=q.game;const radius=g.ball.radius;
     g.state='playing';g.ball.z=-8;q.refresh();const far=q.world.ball.scale.x;
     g.ball.z=10;q.refresh();const near=q.world.ball.scale.x;

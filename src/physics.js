@@ -160,7 +160,7 @@ export class CrystalWellGame {
     // Dragon = cheap moving height field, NOT a detailed mesh collider.
     if (b.vz < 0 && b.z - b.radius < 2.3) {
     const brow = dragonBrow(b.x, b.y, this.time);
-    if (b.z - b.radius <= brow.z) {
+    if (brow.collidable !== false && b.z - b.radius <= brow.z) {
       b.z = brow.z + b.radius + 0.002;
       if (brow.inside) {
         this.reflect(brow.nx, brow.ny, brow.nz);

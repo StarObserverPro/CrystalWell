@@ -26,12 +26,10 @@ export function makeDragon() {
       geometry.setAttribute('aDragonSource',new THREE.BufferAttribute(source,3));
       geometry.setAttribute('aHeadWeight',new THREE.BufferAttribute(weights,1));
       geometry.computeVertexNormals();geometry.computeBoundingSphere();
-      const material=new THREE.MeshPhysicalMaterial({
-        map:o.material.map,color:0xffffff,metalness:.10,roughness:.20,
-        clearcoat:.85,clearcoatRoughness:.11,envMapIntensity:.40,
-        transmission:.08,thickness:1.30,ior:1.52,
-        attenuationColor:new THREE.Color(0x4abcc6),attenuationDistance:7,
+      const material=new THREE.MeshStandardMaterial({
+        map:o.material.map,color:0xffffff,metalness:0,roughness:.90,envMapIntensity:.12,
       });
+      material.userData.matteBody=true;
       material.onBeforeCompile=shader=>{
         Object.assign(shader.uniforms,{cwSealRise:riseUniform,cwHeadRotation:motion,cwNeckPivot:pivot});
         shader.vertexShader=`attribute float aHeadWeight;attribute vec3 aDragonSource;
@@ -45,7 +43,12 @@ export function makeDragon() {
           transformed=mix(transformed,cwNeckPivot+cwHeadRotation*(transformed-cwNeckPivot),aHeadWeight);
           cwDragonPosition=(modelMatrix*vec4(transformed,1.)).xyz;cwSource=aDragonSource;
         `);
-        shader.fragmentShader='varying vec3 cwDragonPosition;varying vec3 cwSource;uniform float cwSealRise;\n'+shader.fragmentShader;
+        shader.fragmentShader=`varying vec3 cwDragonPosition;varying vec3 cwSource;uniform float cwSealRise;
+          float cwEyeMask(){
+            vec3 left=(cwSource-vec3(.15,4.24,2.88))/vec3(.15,.12,.14);
+            vec3 right=(cwSource-vec3(.58,4.19,2.64))/vec3(.15,.12,.14);
+            return 1.-smoothstep(.65,1.,min(dot(left,left),dot(right,right)));
+          }\n`+shader.fragmentShader;
         shader.fragmentShader=shader.fragmentShader.replace('void main() {',`void main(){
           // Only the sealed region is constrained by the well. The lower body is never z-clipped.
           if(cwDragonPosition.z>${(BARRIER.z-.8).toFixed(6)} && length(cwDragonPosition.xy)>9.65+cwSealRise*80.)discard;
@@ -62,9 +65,15 @@ export function makeDragon() {
           float neck=smoothstep(2.55,3.80,cwSource.y);
           diffuseColor.rgb=pigment*(.20+.83*pow(value,.45))*mix(.62,1.,neck);
           diffuseColor.rgb*=mix(.10,1.,smoothstep(.018,.12,value));
+        `).replace('#include <roughnessmap_fragment>',`
+          #include <roughnessmap_fragment>
+          roughnessFactor=mix(.90,.095,cwEyeMask());
+        `).replace('#include <metalnessmap_fragment>',`
+          #include <metalnessmap_fragment>
+          metalnessFactor=mix(0.,.10,cwEyeMask());
         `);
       };
-      material.customProgramCacheKey=()=> 'external-dragon-anatomical-v05';
+      material.customProgramCacheKey=()=> 'external-dragon-matte-eyes-v06';
       const mesh=new THREE.Mesh(geometry,material);mesh.name='Licensed sculpt / weighted neck articulation';
       // Vertex articulation can extend beyond the rest-pose bounds.
       mesh.frustumCulled=false;model.add(mesh);

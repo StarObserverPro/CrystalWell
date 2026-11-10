@@ -27,7 +27,7 @@ function basicFit(x,y,z) {
   return [x,y*cs-z*sn,y*sn+z*cs+DRAGON_FIT.verticalOffset];
 }
 export const NECK_PIVOT = Object.freeze(basicFit(-.10,3.25,2.00));
-export function fitDragonPoint(x,y,z) {
+function priorFit(x,y,z) {
   const p=basicFit(x,y,z),w=headWeight(x,y,z),n=NECK_PIVOT;
   const dx=p[0]-n[0],dy=p[1]-n[1],dz=p[2]-n[2];
   // Fixed neck articulation brings the face towards the incoming ball, independent of camera orbit.
@@ -35,6 +35,15 @@ export function fitDragonPoint(x,y,z) {
   const py=dy*cx-dz*sx,pz=dy*sx+dz*cx;
   return [p[0]+w*(dx*cy+pz*sy-dx),p[1]+w*(py-dy),p[2]+w*(-dx*sy+pz*cy-dz)];
 }
+export const EAR_PIVOT=Object.freeze(priorFit(.227,4.72,2.50));
+export const EAR_AXIS=Object.freeze([Math.cos(Math.PI/9),0,Math.sin(Math.PI/9)]);
+export const EAR_NOD=Math.PI/6;
+export function nodAroundEars(point,weight=1) {
+  const p=EAR_PIVOT,a=EAR_AXIS,v=point.map((n,i)=>n-p[i]),c=Math.cos(EAR_NOD),s=Math.sin(EAR_NOD);
+  const d=v[0]*a[0]+v[1]*a[1]+v[2]*a[2],cross=[-a[2]*v[1],a[2]*v[0]-a[0]*v[2],a[0]*v[1]];
+  return point.map((n,i)=>n+weight*(v[i]*(c-1)+cross[i]*s+a[i]*d*(1-c)));
+}
+export function fitDragonPoint(x,y,z) {return nodAroundEars(priorFit(x,y,z),headWeight(x,y,z));}
 export function headAngles(t) {
   return { pitch:Math.sin(t*1.72)*.032, yaw:Math.sin(t*1.37+.4)*.049,
     roll:Math.sin(t*.91+.8)*.013 };
