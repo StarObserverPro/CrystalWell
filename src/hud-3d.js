@@ -34,11 +34,11 @@ export class SculptedHUD {
   constructor(renderer, game, elements) {
     this.renderer=renderer;this.game=game;this.elements=elements;this.scene=new THREE.Scene();
     this.camera=new THREE.OrthographicCamera(0,1,1,0,-300,300);this.camera.position.z=100;
-    this.scene.add(new THREE.AmbientLight(0xc5e5ff,2));
+    this.scene.add(new THREE.AmbientLight(0xc5e5ff,.75));
     const key=new THREE.DirectionalLight(0xe7f6ff,3.2);key.position.set(-120,200,200);this.scene.add(key);
     const fill=new THREE.DirectionalLight(0x9f85ff,1.5);fill.position.set(200,-20,80);this.scene.add(fill);
-    this.ice=crystal(0x9cdfe7,{metalness:.32,roughness:.21});
-    this.gold=crystal(0xffd794,{metalness:.38,emissiveIntensity:.14});
+    this.ice=crystal(0x9cdfe7,{metalness:.12,roughness:.12});
+    this.gold=crystal(0xffd794,{metalness:.15,emissiveIntensity:.08});
     this.violet=crystal(0xc3a2ed,{metalness:.28,emissiveIntensity:.18});
     this.dim=crystal(0x243444,{metalness:.14,emissiveIntensity:0});
     this.plate=crystal(0x214558,{metalness:.52,roughness:.28});
@@ -58,7 +58,7 @@ export class SculptedHUD {
       const root=new THREE.Group();this.content.add(root);
       const base=put(root,new THREE.CylinderGeometry(25,25,8,8),this.plate);base.rotation.x=Math.PI/2;
       const symbol=emblem(kind,this.ice);symbol.scale.setScalar(29);symbol.position.z=7;root.add(symbol);
-      root.rotation.x=.12;root.userData.symbol=symbol;
+      root.rotation.x=0;root.userData.symbol=symbol;
       if(id==='pause') {const alt=emblem('play',this.gold);alt.scale.setScalar(28);alt.position.z=7;root.add(alt);root.userData.alt=alt;}
       this.buttons[id]=root;
       const el=elements[id];
@@ -98,10 +98,10 @@ export class SculptedHUD {
     this.camera.left=0;this.camera.right=width;this.camera.top=height;this.camera.bottom=0;this.camera.updateProjectionMatrix();
     this.scale=Math.min(1,Math.max(.8,height/650));const s=this.scale;
     this.lives.position.set(32*s,height-37*s,0);this.lives.scale.setScalar(s);
-    this.scoreGroup.position.set(160*s,height-37*s,0);this.scoreGroup.scale.setScalar(s);
+    this.scoreGroup.position.set((height<550?43:160)*s,height-(height<550?68:37)*s,0);this.scoreGroup.scale.setScalar(s);
     let i=0;
     for(const id of ['pause','sound','restart']) {
-      const x=width-(160-i*61)*s,y=height-39*s,root=this.buttons[id];root.position.set(x,y,0);root.scale.setScalar(s);
+      const x=width-(166-i*63)*s,y=height-39*s,root=this.buttons[id];root.position.set(x,y,0);root.scale.setScalar(s);
       const e=this.elements[id];Object.assign(e.style,{left:`${x-28*s}px`,top:`${height-y-28*s}px`,width:`${56*s}px`,height:`${56*s}px`});i++;
     }
     this.progress.position.set(46*s,46*s,0);this.progress.scale.setScalar(s);

@@ -37,13 +37,16 @@ async function shot(name) {
 }
 try{
   await page.goto('http://127.0.0.1:4173/?qa=1',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>window.__crystalWell,{timeout:30000});
+  await page.waitForFunction(()=>window.__crystalWell?.assetsReady,{timeout:60000});
   await page.evaluate(()=>{const q=window.__crystalWell;q.reset();q.game.time=.65;q.freeze();q.refresh();});
   await page.waitForTimeout(300);await shot('desktop');
   metrics.desktop=await page.evaluate(()=>{const q=window.__crystalWell;let lines=0;q.world.scene.traverse(o=>{if(o.isLine)lines++;});return {
     draws:q.renderer.info.render.calls,triangles:q.renderer.info.render.triangles,crystals:q.world.crystals.count,
     sideCrystals:q.world.sideCrystals.count,pixelRatio:q.renderer.getPixelRatio(),fps:document.querySelector('#fps-readout').textContent,
     lives:q.game.lives,lines,score:q.hud.score.value,heldCue:q.world.heldCue.visible};});
+  assert.equal(await page.evaluate(()=>window.__crystalWell.world.rim.children.length),26);
+  assert.equal(await page.evaluate(()=>window.__crystalWell.world.dragon.userData.ready),true);
+  assert.match(await page.evaluate(()=>window.__crystalWell.world.dragon.userData.source),/Grab3D/);
   assert.equal(metrics.desktop.lives,3);assert.equal(metrics.desktop.lines,0);assert.equal(metrics.desktop.heldCue,true);
   assert.equal(metrics.desktop.crystals,metrics.desktop.sideCrystals);assert.equal(metrics.desktop.score,'000000');
   assert.ok(Math.abs(metrics.desktop.pixelRatio-Math.SQRT2)<1e-9);assert.match(metrics.desktop.fps,/\d+ FPS/);
@@ -79,6 +82,20 @@ try{
     g.step(1/60);g.time+=.45;q.refresh();return {state:g.state,reason:g.readyReason,charges:g.effects.bind,cue:q.world.heldCue.visible,launchGlyph:q.world.launchGlyph.visible};});
   assert.equal(metrics.capture.reason,'capture');assert.equal(metrics.capture.cue,true);assert.equal(metrics.capture.launchGlyph,true);
   await page.waitForTimeout(150);await shot('dragon-held');
+  metrics.heldViews=[];
+  for (const time of [0,60,120,180]) {
+    const reading=await page.evaluate(time=>{
+      const q=window.__crystalWell;q.game.time=time;q.refresh();q.drawFrame();
+      const V=q.topCamera.position.constructor,p=q.world.heldCore.getWorldPosition(new V()).project(q.topCamera);
+      const ratio=q.renderer.getPixelRatio(),w=document.querySelector('#main-panel').getBoundingClientRect().width;
+      const x=Math.round((p.x+1)*w*.5*ratio),y=Math.round((p.y+1)*innerHeight*.5*ratio),rgba=new Uint8Array(4);
+      const gl=q.renderer.getContext();gl.readPixels(x,y,1,1,gl.RGBA,gl.UNSIGNED_BYTE,rgba);
+      return {time,rgba:[...rgba],above:q.world.heldCue.position.z>0,visible:q.world.heldCue.visible};
+    },time);
+    metrics.heldViews.push(reading);assert.equal(reading.above&&reading.visible,true);
+    assert.ok(reading.rgba[0]>reading.rgba[1]+10&&reading.rgba[2]>reading.rgba[1]+10,'purple held beacon remains readable through the shield');
+    if(time===120)await shot('held-back');
+  }
   await page.evaluate(()=>{const q=window.__crystalWell;q.game.time=240.65;q.game.heldSince=240.2;q.refresh();});
   await shot('dragon-front');
   await page.keyboard.press('Space');assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'playing');
