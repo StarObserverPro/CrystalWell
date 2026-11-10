@@ -68,6 +68,7 @@ screenScene.add(quad);
 
 let paused = false;
 let simulationFrozen = false;
+let renderSuspended = false;
 let playingLandscape = true;
 let previousTime = performance.now();
 let accumulator = 0;
@@ -84,6 +85,7 @@ const shieldPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -RULES.shieldZ);
 const pointer = new THREE.Vector2();
 const hitPoint = new THREE.Vector3();
 let lastPointer = null;
+let pointerGesture = null;
 const keys = new Set();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let soundEnabled = true;
@@ -170,18 +172,24 @@ function aimFromPointer(event) {
   reprojectPointer();
 }
 mainPanel.addEventListener('pointerleave', () => { lastPointer = null; });
-mainPanel.addEventListener('pointercancel', () => { lastPointer = null; });
+mainPanel.addEventListener('pointercancel', () => { lastPointer = null; pointerGesture = null; });
 mainPanel.addEventListener('pointermove', e => { if (!paused) aimFromPointer(e); });
 mainPanel.addEventListener('pointerdown', e => {
-  if (paused || !playingLandscape || e.target.closest('button')) return;
+  if (paused || !playingLandscape || e.target.closest('button') || e.button !== 0 || !e.isPrimary) return;
+  document.activeElement?.blur?.();
+  pointerGesture = { id: e.pointerId, held: game.held, heldSince: game.heldSince };
   initAudio(); mainPanel.setPointerCapture?.(e.pointerId); aimFromPointer(e);
 });
 mainPanel.addEventListener('pointerup', e => {
   if (mainPanel.hasPointerCapture?.(e.pointerId)) mainPanel.releasePointerCapture(e.pointerId);
-  if (!paused && playingLandscape && game.held) game.launch();
+  const gesture = pointerGesture; pointerGesture = null;
+  if (!paused && playingLandscape && game.held && gesture?.id === e.pointerId
+      && gesture.held && gesture.heldSince === game.heldSince) game.launch();
   if (e.pointerType !== 'mouse') lastPointer = null;
 });
 window.addEventListener('keydown', event => {
+  // A focused accessible control owns Space/Enter; never turn its activation into a shot.
+  if (event.target.closest?.('button') && (event.key === ' ' || event.key === 'Enter')) return;
   if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' ','Escape'].includes(event.key)) event.preventDefault();
   if (event.key === 'Escape' || event.key.toLowerCase() === 'p') {
     if (!event.repeat && playingLandscape) togglePause();
@@ -202,13 +210,13 @@ document.addEventListener('visibilitychange', () => {
 
 function reset() {
   game.restart(); world.resetField(); vfx.clear();
-  accumulator = 0; lastPointer = null; lastSideFrame = -1e5; keys.clear();
+  accumulator = 0; lastPointer = null; pointerGesture = null; lastSideFrame = -1e5; keys.clear();
   frameMeter.reset(); updateCameras(); paused = false; simulationFrozen = false;
   world.update(0, game.time); updateHud();
 }
 function setPaused(value) {
   if (game.state === 'lost' || game.state === 'won') return;
-  paused = value; keys.clear(); lastPointer = null; accumulator = 0;
+  paused = value; keys.clear(); lastPointer = null; pointerGesture = null; accumulator = 0;
   previousTime = performance.now(); frameMeter.reset(); updateHud();
   elements.pause.setAttribute('aria-label', paused ? '继续游戏' : '暂停游戏');
 }
@@ -224,6 +232,10 @@ elements.sound.addEventListener('click', () => {
   if (soundEnabled) initAudio();
   updateHud();
 });
+// Pointer activation returns keyboard control to the game. Tab activation retains focus.
+for (const control of [elements.pause, elements.sound, elements.restart, elements.center]) {
+  control.addEventListener('click', event => { if (event.detail > 0) control.blur(); });
+}
 const observer = new ResizeObserver(resize);
 observer.observe(app);
 window.addEventListener('resize', resize);
@@ -296,6 +308,7 @@ function render(now) {
 
 function frame(now) {
   requestAnimationFrame(frame);
+  if (renderSuspended) { previousTime = now; return; }
   const dt = Math.min(.045, Math.max(0, (now - previousTime) / 1000));
   previousTime = now;
   if (!playingLandscape) { frameMeter.reset(); render(now); return; }
@@ -341,7 +354,10 @@ requestAnimationFrame(frame);
 
 if (new URLSearchParams(location.search).has('qa')) {
   window.__crystalWell = { game, world, renderer, topCamera, sideCamera, frameMeter, hud, sideTarget, quality: QUALITY, reset,
-    get paused() { return paused; }, freeze: () => { simulationFrozen = true; }, unfreeze: () => { simulationFrozen = false; },
+    get paused() { return paused; },
+    suspendRendering: () => { renderSuspended = true; }, resumeRendering: () => { renderSuspended = false; },
+    drawFrame: () => { render(performance.now()); renderer.getContext().finish(); },
+    freeze: () => { simulationFrozen = true; }, unfreeze: () => { simulationFrozen = false; },
     pause: () => setPaused(true), resume: () => setPaused(false),
     refresh: () => { updateCameras(); world.update(0, game.time); updateHud(); lastSideFrame = -1e5; } };
 }

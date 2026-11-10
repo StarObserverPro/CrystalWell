@@ -28,11 +28,18 @@ await context.route('https://cdn.jsdelivr.net/npm/three@0.187.0/**',async route=
 const page=await context.newPage();
 page.on('pageerror',e=>errors.push(String(e)));
 page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+// Stop queuing new GPU frames while SwiftShader captures a full-quality image.
+async function shot(name) {
+  await page.evaluate(()=>window.__crystalWell.suspendRendering());
+  await page.evaluate(()=>window.__crystalWell.drawFrame());
+  await page.screenshot({path:`artifacts/${name}.png`,timeout:120000});
+  await page.evaluate(()=>window.__crystalWell.resumeRendering());
+}
 try{
   await page.goto('http://127.0.0.1:4173/?qa=1',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>window.__crystalWell,{timeout:30000});
   await page.evaluate(()=>{const q=window.__crystalWell;q.reset();q.game.time=.65;q.freeze();q.refresh();});
-  await page.waitForTimeout(1300);await page.screenshot({path:'artifacts/desktop.png'});
+  await page.waitForTimeout(300);await shot('desktop');
   metrics.desktop=await page.evaluate(()=>{const q=window.__crystalWell;let lines=0;q.world.scene.traverse(o=>{if(o.isLine)lines++;});return {
     draws:q.renderer.info.render.calls,triangles:q.renderer.info.render.triangles,crystals:q.world.crystals.count,
     sideCrystals:q.world.sideCrystals.count,pixelRatio:q.renderer.getPixelRatio(),fps:document.querySelector('#fps-readout').textContent,
@@ -50,28 +57,38 @@ try{
   await page.mouse.move(xy.x,xy.y);const aim=await page.evaluate(()=>window.__crystalWell.game.shield);
   assert.ok(Math.abs(aim.targetX-2)<.025&&Math.abs(aim.targetY+3)<.025);
   // Pausing cannot launch or move the shield. Repeated Esc keydown must not toggle twice.
+  await page.evaluate(()=>window.__crystalWell.unfreeze());
   await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__crystalWell.paused),true);
   const frozen=await page.evaluate(()=>({time:window.__crystalWell.game.time,score:window.__crystalWell.game.score}));
   await page.keyboard.press('Space');await page.waitForTimeout(180);
   assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'ready');
   assert.equal(await page.evaluate(()=>window.__crystalWell.game.time),frozen.time);
-  await page.screenshot({path:'artifacts/paused.png'});
+  await shot('paused');
   await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__crystalWell.paused),false);
+  await page.evaluate(()=>window.__crystalWell.freeze());
   // HUD interaction must not be mistaken for shield input or a launch.
   await page.locator('#sound').click();assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'ready');
+  await page.locator('#sound').focus();await page.keyboard.press('Space');
+  assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'ready','Space on a focused HUD button cannot shoot');
+  await page.locator('#sound').evaluate(el=>el.blur());
   await page.keyboard.press('Space');assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'playing');
   // Force a bind catch through the real physics path, then inspect its visual state.
   metrics.capture=await page.evaluate(()=>{const q=window.__crystalWell,g=q.game;
     g.grid.fill(0);q.world.removeCrystals(q.world.records.map(r=>r.id));g.effects.bind=2;g.state='playing';
     Object.assign(g.shield,{x:0,y:-3,targetX:0,targetY:-3});Object.assign(g.ball,{x:0,y:-3,z:10.18,vx:0,vy:0,vz:7.4});
-    g.step(1/60);q.refresh();return {state:g.state,reason:g.readyReason,charges:g.effects.bind,cue:q.world.heldCue.visible,launchGlyph:q.world.launchGlyph.visible};});
+    g.step(1/60);g.time+=.45;q.refresh();return {state:g.state,reason:g.readyReason,charges:g.effects.bind,cue:q.world.heldCue.visible,launchGlyph:q.world.launchGlyph.visible};});
   assert.equal(metrics.capture.reason,'capture');assert.equal(metrics.capture.cue,true);assert.equal(metrics.capture.launchGlyph,true);
-  await page.waitForTimeout(150);await page.screenshot({path:'artifacts/dragon-held.png'});
+  await page.waitForTimeout(150);await shot('dragon-held');
   await page.keyboard.press('Space');assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'playing');
+  // A capture arriving during an existing drag must not launch when that drag ends.
+  await page.mouse.move(400,450);await page.mouse.down();
+  await page.evaluate(()=>{const q=window.__crystalWell;q.game.state='ready';q.game.readyReason='capture';q.game.heldSince+=1;q.refresh();});
+  await page.mouse.up();assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'ready');
+  await page.keyboard.press('Space');
   // Rising pickup models have distinctive solids inside their translucent spheres.
   await page.evaluate(()=>{const q=window.__crystalWell,g=q.game;g.score=12340;g.multiplier=3;
     ['wide','slow','bind','treasure'].forEach((kind,i)=>g.spawnPickup({x:-4.5+i*3,y:-4,z:6.5+i*.65},kind));q.refresh();});
-  await page.waitForTimeout(200);await page.screenshot({path:'artifacts/bubbles.png'});
+  await page.waitForTimeout(200);await shot('bubbles');
   // Miss -> empty shield -> new manual serve, not an unexplained recapture.
   metrics.respawn=await page.evaluate(()=>{const q=window.__crystalWell,g=q.game;g.loseBall();q.refresh();
     const missing={state:g.state,visible:q.world.ball.visible,lives:g.lives};for(let i=0;i<120;i++)g.step(1/120);q.refresh();
@@ -81,17 +98,20 @@ try{
   await page.evaluate(()=>{const q=window.__crystalWell;q.game.state='won';q.game.wonAt=q.game.time;q.refresh();});
   assert.equal(await page.evaluate(()=>window.__crystalWell.hud.modal.visible),false);
   await page.evaluate(()=>{const q=window.__crystalWell;q.game.time+=3;q.world.update(0,q.game.time,.5);q.refresh();q.world.update(0,q.game.time,.5);});
-  await page.waitForTimeout(150);await page.screenshot({path:'artifacts/dragon-rising.png'});
+  await page.waitForTimeout(150);await shot('dragon-rising');
   // Restore the full brick field for mobile composition checks.
   await page.setViewportSize({width:844,height:390});
   await page.evaluate(()=>{const q=window.__crystalWell;q.reset();q.game.time=.7;q.freeze();q.refresh();});
-  await page.waitForTimeout(350);await page.screenshot({path:'artifacts/landscape.png'});
+  await page.waitForTimeout(350);await shot('landscape');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);
-  await page.screenshot({path:'artifacts/portrait.png'});
+  await shot('portrait');
   assert.equal(await page.evaluate(()=>window.__crystalWell.hud.portrait.visible),true);
   assert.equal(await page.evaluate(()=>window.__crystalWell.hud.content.visible),false);
   assert.deepEqual(errors,[],'Browser/shader errors');
+}catch(error){
+  metrics.failure=String(error);
+  throw error;
 }finally{
   await fs.writeFile('artifacts/browser-report.json',JSON.stringify({metrics,errors},null,2));
   await browser.close();server.close();

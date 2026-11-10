@@ -21,8 +21,9 @@ export class RoyalCrystalWorld extends LuminousCrystalWorld {
     }
     this.launchGlyph=emblem('play',this.holdMaterial);this.launchGlyph.scale.setScalar(.47);
     this.launchGlyph.position.set(0,-.88,.44);this.shield.add(this.launchGlyph);
+    this.chargeMaterial=crystal(0xd19aff,{emissiveIntensity:.5});
     this.bindGems=[];
-    for(let i=0;i<3;i++) this.bindGems.push(put(this.shield,new THREE.OctahedronGeometry(.12,1),this.holdMaterial,[-.28+i*.28,.96,.24]));
+    for(let i=0;i<3;i++) this.bindGems.push(put(this.shield,new THREE.OctahedronGeometry(.12,1),this.chargeMaterial,[-.28+i*.28,.96,.24]));
     // Replace the old fine ring marker with a broad, faceted landing pebble.
     this.predictor.geometry.dispose();this.predictor.geometry=new THREE.OctahedronGeometry(.43,0);
     this.predictor.material.opacity=.48;
@@ -101,7 +102,7 @@ export class RoyalCrystalWorld extends LuminousCrystalWorld {
     this.heldCue.rotation.z=t*.55;
     const breathe=1+Math.sin(t*3)*.10;
     this.heldCue.scale.set(breathe,breathe,1);
-    this.holdMaterial.color.set(g.readyReason==='capture'||g.effects.bind>0?0xd19aff:0x80f5e8);
+    this.holdMaterial.color.set(g.readyReason==='capture'?0xd19aff:0x80f5e8);
     this.holdMaterial.emissive.copy(this.holdMaterial.color);
     this.launchGlyph.scale.setScalar(.46*(1+Math.sin(t*3)*.15));
     this.bindGems.forEach((o,i)=>{o.visible=i<g.effects.bind;});
