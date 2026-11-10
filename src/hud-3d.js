@@ -11,7 +11,7 @@ const POS = [[0,1.0,0],[.48,.50,1],[.48,-.5,1],[0,-1,0],[-.48,-.5,1],[-.48,.5,1]
 export class CrystalDigits extends THREE.Group {
   constructor(maxChars, material, unit = 9) {
     super(); this.maxChars = maxChars; this.unit = unit; this.value = null;
-    const geo = polygon([[-.34,-.105],[.34,-.105],[.43,0],[.34,.105],[-.34,.105],[-.43,0]], .16, .025);
+    const geo = polygon([[-.32,-.14],[.32,-.14],[.43,0],[.32,.14],[-.32,.14],[-.43,0]], .20, .03);
     this.mesh = new THREE.InstancedMesh(geo, material, maxChars * 7); this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.add(this.mesh);
     this.set('0');
@@ -51,7 +51,7 @@ export class SculptedHUD {
     this.scoreGroup=new THREE.Group();this.content.add(this.scoreGroup);
     const trophy=emblem('treasure',this.gold);trophy.scale.setScalar(20);trophy.position.set(-25,0,0);this.scoreGroup.add(trophy);
     this.score=new CrystalDigits(7,this.gold,10);this.scoreGroup.add(this.score);
-    this.combo=new CrystalDigits(1,this.violet,8);this.combo.position.set(118,-24,0);this.scoreGroup.add(this.combo);
+    this.combo=new CrystalDigits(1,this.violet,8);this.combo.position.set(113,0,0);this.scoreGroup.add(this.combo);
     const x=emblem('cross',this.violet);x.scale.setScalar(9);x.position.set(-14,0,0);this.combo.add(x);
     this.buttons={};
     for(const [id,kind] of [['pause','pause'],['sound','sound'],['restart','restart']]) {
@@ -74,11 +74,11 @@ export class SculptedHUD {
     this.effects=new THREE.Group();this.content.add(this.effects);this.effectIcons={};
     ['wide','slow','bind'].forEach((kind,i)=>{const icon=emblem(kind,this.violet);icon.scale.setScalar(22);icon.position.set(i*48,0,0);this.effects.add(icon);this.effectIcons[kind]=icon;});
     this.fpsGroup=new THREE.Group();this.content.add(this.fpsGroup);
-    this.fpsMaterial=this.ice.clone();this.fps=new CrystalDigits(3,this.fpsMaterial,6);this.fpsGroup.add(this.fps);
-    const label=new CrystalDigits(3,this.ice,4.2);label.set('FPS');label.position.set(38,0,0);this.fpsGroup.add(label);
-    this.sideFps=new CrystalDigits(2,this.ice,4);this.sideFps.position.set(17,-19,0);this.fpsGroup.add(this.sideFps);
-    const cube=emblem('frame',this.ice);cube.scale.setScalar(9);cube.position.set(0,-19,0);this.fpsGroup.add(cube);
-    this.ms=new CrystalDigits(3,this.ice,3.8);this.ms.position.set(43,-19,0);this.fpsGroup.add(this.ms);
+    this.fpsMaterial=this.ice.clone();this.fps=new CrystalDigits(3,this.fpsMaterial,8);this.fpsGroup.add(this.fps);
+    const label=new CrystalDigits(3,this.ice,6);label.set('FPS');label.position.set(47,0,0);this.fpsGroup.add(label);
+    this.sideFps=new CrystalDigits(2,this.ice,5);this.sideFps.position.set(18,-24,0);this.fpsGroup.add(this.sideFps);
+    const cube=emblem('frame',this.ice);cube.scale.setScalar(9);cube.position.set(0,-24,0);this.fpsGroup.add(cube);
+    this.ms=new CrystalDigits(5,this.ice,5);this.ms.position.set(50,-24,0);this.fpsGroup.add(this.ms);
 
     this.modal=new THREE.Group();this.scene.add(this.modal);
     this.scrim=put(this.modal,new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0x030c18,transparent:true,opacity:.72,depthWrite:false}),[0,0,30]);
@@ -96,9 +96,9 @@ export class SculptedHUD {
   resize(width,height,mainWidth) {
     this.width=width;this.height=height;this.mainWidth=mainWidth;
     this.camera.left=0;this.camera.right=width;this.camera.top=height;this.camera.bottom=0;this.camera.updateProjectionMatrix();
-    this.scale=Math.min(1,Math.max(.72,height/650));const s=this.scale;
+    this.scale=Math.min(1,Math.max(.8,height/650));const s=this.scale;
     this.lives.position.set(32*s,height-37*s,0);this.lives.scale.setScalar(s);
-    this.scoreGroup.position.set(Math.max(170*s,mainWidth*.48-32*s),height-37*s,0);this.scoreGroup.scale.setScalar(s);
+    this.scoreGroup.position.set(160*s,height-37*s,0);this.scoreGroup.scale.setScalar(s);
     let i=0;
     for(const id of ['pause','sound','restart']) {
       const x=width-(160-i*61)*s,y=height-39*s,root=this.buttons[id];root.position.set(x,y,0);root.scale.setScalar(s);
@@ -106,7 +106,7 @@ export class SculptedHUD {
     }
     this.progress.position.set(46*s,46*s,0);this.progress.scale.setScalar(s);
     this.effects.position.set(107*s,37*s,0);this.effects.scale.setScalar(s);
-    this.fpsGroup.position.set(width-108*s,44*s,0);this.fpsGroup.scale.setScalar(s);
+    this.fpsGroup.position.set(width-135*s,44*s,0);this.fpsGroup.scale.setScalar(s*1.3);
     this.scrim.position.set(width/2,height/2,30);this.scrim.scale.set(width,height,1);
     this.modalButton.position.set(mainWidth/2,height/2,40);this.modalButton.scale.setScalar(s);
     this.modalScore.position.set(mainWidth/2-62*s,height/2-95*s,40);this.modalScore.scale.setScalar(s);

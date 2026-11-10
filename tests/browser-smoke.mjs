@@ -79,6 +79,8 @@ try{
     g.step(1/60);g.time+=.45;q.refresh();return {state:g.state,reason:g.readyReason,charges:g.effects.bind,cue:q.world.heldCue.visible,launchGlyph:q.world.launchGlyph.visible};});
   assert.equal(metrics.capture.reason,'capture');assert.equal(metrics.capture.cue,true);assert.equal(metrics.capture.launchGlyph,true);
   await page.waitForTimeout(150);await shot('dragon-held');
+  await page.evaluate(()=>{const q=window.__crystalWell;q.game.time=240.65;q.game.heldSince=240.2;q.refresh();});
+  await shot('dragon-front');
   await page.keyboard.press('Space');assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'playing');
   // A capture arriving during an existing drag must not launch when that drag ends.
   await page.mouse.move(400,450);await page.mouse.down();
@@ -104,6 +106,8 @@ try{
   await page.evaluate(()=>{const q=window.__crystalWell;q.reset();q.game.time=.7;q.freeze();q.refresh();});
   await page.waitForTimeout(350);await shot('landscape');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  assert.equal(await page.evaluate(()=>{const h=window.__crystalWell.hud;return h.scoreGroup.position.x<200 &&
+    h.fpsGroup.scale.x>=1 && parseFloat(document.querySelector('#pause').style.width)>=44;}),true,'Mobile score clears the rim and touch targets stay large');
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);
   await shot('portrait');
   assert.equal(await page.evaluate(()=>window.__crystalWell.hud.portrait.visible),true);

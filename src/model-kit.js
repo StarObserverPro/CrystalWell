@@ -7,7 +7,7 @@ export function put(parent, geometry, material, position = [0, 0, 0], scale = [1
 }
 export function crystal(color, options = {}) {
   return new THREE.MeshPhysicalMaterial({ color, metalness: .22, roughness: .19,
-    clearcoat: 1, clearcoatRoughness: .12, envMapIntensity: 1.3,
+    flatShading: true, clearcoat: 1, clearcoatRoughness: .12, envMapIntensity: 1.3,
     emissive: color, emissiveIntensity: .055, ...options });
 }
 export function polygon(points, depth = .2, bevel = .04) {
