@@ -1,10 +1,12 @@
 import * as THREE from 'three';
+import { QUALITY } from './quality.js';
 
 /** A small, generated reflection environment. No network assets or SVG textures. */
 export function makeReflectionEnvironment() {
   const canvas = document.createElement('canvas');
-  canvas.width = 512; canvas.height = 256;
+  canvas.width = QUALITY.reflectionWidth; canvas.height = QUALITY.reflectionHeight;
   const ctx = canvas.getContext('2d');
+  ctx.scale(QUALITY.reflectionWidth / 512, QUALITY.reflectionHeight / 256);
   const sky = ctx.createLinearGradient(0, 0, 0, 256);
   sky.addColorStop(0, '#bddaff'); sky.addColorStop(.32, '#758dad');
   sky.addColorStop(.49, '#dbf7ff'); sky.addColorStop(.54, '#354967');
@@ -71,7 +73,7 @@ export function makeCrystalMaterial(lamps) {
         }
         vec3 color = vTint * light;
         color += vec3(.35,.68,.86) * (fresnel*.42 + band*.20);
-        color += mix(vTint,vec3(.70,.90,1.),.5) * edge*.25 + vec3(sparkle*.65);
+        color += mix(vTint,vec3(.70,.90,1.),.5) * band*.12 + vec3(sparkle*.65);
         // A slight bevel shadow separates bricks without drawing a wireframe over the scene.
         color *= mix(1.,.70,smoothstep(.72,.87,max(q.x,q.y))*(1.-edge));
         // Near faces retain stronger definition; distant layers stay translucent.

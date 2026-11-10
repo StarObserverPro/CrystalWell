@@ -65,7 +65,7 @@ test('missing the shield consumes a life and ultimately loses', () => {
   assert.equal(game.state, 'lost');
 });
 
-test('game launches automatically; collision simulation stays finite', () => {
+test('legacy collision kernel auto-serve remains finite (production uses explicit AdventureGame serve)', () => {
   const game = new CrystalWellGame();
   for (let i = 0; i < 4800; i++) {
     game.step(1 / 120);

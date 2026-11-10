@@ -1,123 +1,107 @@
 import * as THREE from 'three';
+import { dragonPose, DRAGON } from './dragon-shape.js';
+import { put, crystal, taperedCurve, batchStatic } from './model-kit.js';
 
-// Procedural Eastern-style crystal dragon. Its complex silhouette is visual only:
-// gameplay collides with the lightweight brow height field in physics.js.
-const AMETHYST = 0x786eab;
-const INDIGO = 0x3b4b88;
-const ICE = 0x91dbe5;
-
-function gemMaterial(color, opacity = 0.86) {
-  return new THREE.MeshPhongMaterial({
-    color, emissive: new THREE.Color(color).multiplyScalar(0.19),
-    shininess: 110, specular: 0x8dccf2,
-    flatShading: true, transparent: opacity < 1, opacity,
-    depthWrite: opacity >= 1,
-  });
-}
-
-function taperedSegment(parent, a, b, r0, r1, material, sides = 6) {
-  const dir = new THREE.Vector3().subVectors(b, a);
-  const geometry = new THREE.CylinderGeometry(r1, r0, dir.length(), sides, 1);
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.copy(a).add(b).multiplyScalar(.5);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
-  parent.add(mesh);
-  return mesh;
-}
-function v(x, y, z) { return new THREE.Vector3(x, y, z); }
-function tetra(parent, x, y, z, size, colorMaterial, rotation = 0) {
-  const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(size, 0), colorMaterial);
-  mesh.position.set(x, y, z); mesh.rotation.set(rotation, .23, rotation * .5);
-  parent.add(mesh); return mesh;
-}
-function whisker(parent, coords, material) {
-  const curve = new THREE.CatmullRomCurve3(coords.map(p => v(...p)));
-  parent.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 17, .038, 4, false), material));
-}
-
+/** A broad Eastern dragon: long muzzle, heavy eyebrows, antlers, mane, beard and swept whiskers.
+ * The entire head silhouette fits within the 19.44-unit well; only its brow is a collider.
+ */
 export function makeDragon() {
-  const root = new THREE.Group();
-  root.name = 'Sleeping Crystal Dragon';
-  const purple = gemMaterial(AMETHYST, .94);
-  const dark = gemMaterial(INDIGO, .97);
-  const azure = gemMaterial(0x56a9bb, .87);
-  const frosted = gemMaterial(ICE, .91);
-  const pink = gemMaterial(0xdc9fe3, .95);
-  const eye = new THREE.MeshBasicMaterial({ color: 0xf9f0bd });
-  const vein = new THREE.MeshBasicMaterial({ color: 0x6de5f5, transparent: true, opacity: .82 });
-
-  // The long coiled body becomes visible as the dragon rises from the well.
-  const bodyCurve = new THREE.CatmullRomCurve3([
-    v(0, .8, .22), v(.6, 2.1, -.6), v(2.3, 1.6, -1.65),
-    v(2.0, -1.8, -3.1), v(-1.4, -2.2, -4.8), v(-2.1, 1.4, -6.1),
-    v(1.4, 2.2, -7.5), v(2.2, -1.8, -9.0), v(-1.8, -2.0, -10.6),
-  ]);
-  const body = new THREE.Mesh(new THREE.TubeGeometry(bodyCurve, 80, .52, 7, false), dark);
-  root.add(body);
-  for (let i = 2; i < 60; i += 3) {
-    const t = i / 70;
-    const p = bodyCurve.getPoint(t);
-    const side = bodyCurve.getTangent(t);
-    const up = v(-side.y, side.x, .85).normalize();
-    taperedSegment(root, p.clone().addScaledVector(up, .22),
-      p.clone().addScaledVector(up, .9 * (1 - t * .35)), .17 * (1 - t * .55), 0, i % 2 ? frosted : purple, 4);
-  }
-
-  const head = new THREE.Group();
-  head.position.set(0, 0, .94);
-  root.add(head);
-  const skull = new THREE.Mesh(new THREE.IcosahedronGeometry(1.12, 1), purple);
-  skull.scale.set(1.03, 1.36, .70); skull.position.set(0, .25, .02);
-  head.add(skull);
-  const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(.91, 0), azure);
-  crown.scale.set(1.02, .95, .42); crown.position.set(0, .06, .53);
-  head.add(crown);
-  const bridge = new THREE.Mesh(new THREE.IcosahedronGeometry(.64, 1), dark);
-  bridge.scale.set(.83, 1.85, .65); bridge.position.set(0, -1.02, -.19);
-  head.add(bridge);
-  const snout = new THREE.Mesh(new THREE.ConeGeometry(.49, 1.25, 6), frosted);
-  snout.rotation.z = Math.PI; snout.position.set(0, -1.85, -.24);
-  head.add(snout);
+  const root = new THREE.Group(); root.name = 'Crystal sovereign / full-well dragon';
+  const jade = crystal(0x438ca4, { roughness: .22, metalness: .26 });
+  const dark = crystal(0x293d73, { roughness: .3, metalness: .32 });
+  const blue = crystal(0x759ddc, { roughness: .16 });
+  const ice = crystal(0xa5e9ed, { roughness: .13 });
+  const violet = crystal(0xa890ce, { roughness: .16 });
+  const black = crystal(0x07131f, { roughness: .35, metalness: .05 });
+  const gold = crystal(0xffd58b, { emissiveIntensity: .8, roughness: .12 });
+  const head = new THREE.Group(); head.name = '17.14-wide antlered head'; root.add(head);
+  const ellipsoid = (p, s, mat, detail = 2) => put(head, new THREE.IcosahedronGeometry(1, detail), mat, p, s);
+  ellipsoid([0, .6, -.3], [4.7, 4.5, 1.12], jade);
+  ellipsoid([0, -.6, .08], [3.55, 3.45, .8], blue);
+  ellipsoid([0, -3.5, -.34], [2.5, 2.8, .76], jade);
+  ellipsoid([0, -5.55, -.34], [2.72, 1.18, .65], ice);
+  // A genuinely separate jaw and nose, rather than a triangular cone for a face.
+  ellipsoid([0, -4.55, -.99], [2.58, 2.25, .35], dark);
+  ellipsoid([0, -5.9, -.77], [2.5, .7, .28], violet);
+  ellipsoid([0, -5.65, .03], [1.82, .76, .35], blue);
   for (const sign of [-1, 1]) {
-    // Characteristic long antler-like horns: avoids generic winged western dragon.
-    taperedSegment(head, v(sign * .77, .62, .36), v(sign * 1.27, .83, 1.19), .23, .17, dark);
-    taperedSegment(head, v(sign * 1.27, .83, 1.19), v(sign * 1.58, 1.28, 2.12), .17, 0, frosted);
-    taperedSegment(head, v(sign * 1.18, .79, 1.05), v(sign * 1.75, .23, 1.61), .10, 0, azure, 5);
-    taperedSegment(head, v(sign * 1.40, 1.01, 1.51), v(sign * 1.79, 1.57, 1.79), .08, 0, pink, 5);
-    // Angular cheek fins and jaw extensions.
-    tetra(head, sign * 1.14, -.12, -.12, .63, sign > 0 ? azure : purple, sign * .35);
-    tetra(head, sign * 1.26, .38, .42, .40, frosted, sign * .27);
-    const e = new THREE.Mesh(new THREE.SphereGeometry(.17, 9, 6), eye);
-    e.position.set(sign * .56, -.78, .12); head.add(e);
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(.077, 8, 6), dark);
-    pupil.position.set(sign * .59, -.91, .15); head.add(pupil);
-    const lower = new THREE.Mesh(new THREE.SphereGeometry(.25, 6, 5), vein);
-    lower.scale.set(.7, .22, .3); lower.position.set(sign * .34, -1.51, -.35); head.add(lower);
-    whisker(head, [
-      [sign * .5, -1.4, -.3], [sign * .97, -2.02, -.28],
-      [sign * 1.72, -2.38, -.47], [sign * 2.17, -2.13, -.21],
-    ], frosted);
+    const nostril = ellipsoid([sign * 1.14, -6.17, .12], [.40, .21, .14], black, 1);
+    nostril.rotation.z = -sign * .2;
+    // Eyes look up towards the player under thick, slanted brows.
+    const socket = ellipsoid([sign * 2.55, -2.6, .48], [1.12, .75, .24], dark);
+    socket.rotation.z = sign * .24;
+    const eye = ellipsoid([sign * 2.5, -2.78, .67], [.66, .36, .14], gold);
+    eye.rotation.z = sign * .26;
+    ellipsoid([sign * 2.5, -2.79, .81], [.11, .28, .045], black, 1);
+    const brow = ellipsoid([sign * 2.5, -2.12, .76], [1.35, .48, .34], ice, 1);
+    brow.rotation.z = sign * .30;
+    ellipsoid([sign * 4.0, -.85, -.05], [1.55, 2.0, .87], blue, 1);
+    // Broad ear fins and overlapping cheek mane plates.
+    for (let j = 0; j < 7; j++) {
+      const a = -.8 + j * .25;
+      const plate = put(head, new THREE.OctahedronGeometry(1, 1), j % 2 ? violet : ice,
+        [sign * (4.4 + Math.sin(j * .45) * .5), -1.7 + j * .91, .02], [1.50, .55, .35]);
+      plate.rotation.z = sign * a;
+    }
+    // Long antlers spread along the rim, staying below the first crystal layer.
+    const horn = [[sign * 3.6, 2.0, .25], [sign * 4.9, 3.4, .88],
+      [sign * 5.9, 4.2, 1.04], [sign * 5.8, 5.6, 1.17], [sign * 6.3, 6.0, 1.2]];
+    put(head, taperedCurve(horn, .52, .04, 32, 10), ice);
     for (let j = 0; j < 3; j++) {
-      const y = -.35 + j * .58;
-      taperedSegment(head, v(sign * (.84 + j * .04), y, .36),
-        v(sign * (1.27 + j * .17), y + .24, .75 + .19 * j), .16, 0, j % 2 ? pink : frosted, 5);
+      const x = 4.9 + j * .36, y = 3.4 + j * .66;
+      put(head, taperedCurve([[sign * x, y, .85], [sign * (x + 1.3), y + .13, 1.03],
+        [sign * (x + 1.7), y + .55, 1.13]], .22, .025, 14, 8), j % 2 ? violet : blue);
+    }
+    // Sculpted thick whiskers; not wire strokes or line primitives.
+    put(head, taperedCurve([[sign * 2.0, -5.52, -.03], [sign * 4.3, -6.16, .1],
+      [sign * 6.7, -5.6, .30], [sign * 8.45, -2.50, .55], [sign * 8.25, -.8, .8]], .24, .07, 40, 10), ice);
+    for (let j = 0; j < 3; j++) {
+      const fang = put(head, new THREE.ConeGeometry(.16, .48, 8), ice,
+        [sign * (1.0 + j * .56), -5.25 - j * .12, -.84]);
+      fang.rotation.x = Math.PI / 2;
+    }
+    // Beard clumps fan below the chin.
+    for (let j = 0; j < 3; j++) {
+      put(head, taperedCurve([[sign * (.4 + j * .45), -5.9, -.8], [sign * (1 + j * .6), -7.0, -.7],
+        [sign * (1.4 + j * .65), -7.5 + j * .26, -.3]], .28, .035, 18, 8), j % 2 ? violet : ice);
     }
   }
-  // Forehead crystal crown, softly glowing while the dragon is sealed.
-  tetra(head, 0, -.42, .86, .43, pink, .4);
-  tetra(head, 0, -.02, .98, .29, frosted, .25);
-  for (let j = 0; j < 4; j++) tetra(head, 0, .55 + j * .28, .76 + j * .09, .24 + .06 * j, purple, j * .23);
+  // Overlapping crown scales make the forehead a coherent sculpted surface.
+  for (let row = 0; row < 5; row++) for (let col = -2; col <= 2; col++) {
+    const x = col * 1.03, y = -.85 + row * .96;
+    const s = put(head, new THREE.OctahedronGeometry(1, 1), (row + col) % 3 ? jade : violet,
+      [x, y, .72 - row * .018], [.62, .84, .19]);
+    s.rotation.z = .12 * col;
+  }
+  put(head, new THREE.OctahedronGeometry(.66, 1), gold, [0, -1.10, .95], [.8, 1.2, .3]);
+  for (let j = 0; j < 5; j++) {
+    put(head, new THREE.OctahedronGeometry(1, 1), j % 2 ? blue : ice,
+      [0, 1.2 + j * .68, .74], [.38, .66, .30]);
+  }
+  batchStatic(head);
 
-  const glow = new THREE.PointLight(0x8abaff, .62, 10, 2);
-  glow.position.set(0, -.5, .6); head.add(glow);
-  root.userData.head = head;
-  root.userData.glow = glow;
+  const body = new THREE.Group(); body.name = 'Coiled crystal body'; root.add(body);
+  const curve = [[0, 4.1, -1.3], [3.4, 3.8, -3.1], [4, -2, -5.4],
+    [-3.8, -2.5, -7.4], [-4, 3.5, -10], [4.1, 2.2, -12.6], [1.6, -4.8, -15.3], [-3.5, -2.5, -19]];
+  put(body, taperedCurve(curve, 1.75, .12, 160, 14), jade);
+  const spine = new THREE.CatmullRomCurve3(curve.map(p => new THREE.Vector3(...p)));
+  for (let j = 1; j < 40; j++) {
+    const t = j / 42, p = spine.getPointAt(t);
+    const scale = 1 - .72 * t;
+    put(body, new THREE.OctahedronGeometry(1, 1), j % 2 ? ice : violet,
+      [p.x, p.y, p.z + .7], [.45 * scale, .8 * scale, .9 * scale]);
+  }
+  batchStatic(body);
+  const glow = new THREE.PointLight(0x7fe2ff, 5, 18, 1.8);
+  glow.position.set(0, -2, 2.6); root.add(glow);
+  root.userData.head = head; root.userData.glow = glow; root.userData.silhouetteWidth = DRAGON.silhouetteWidth;
   root.userData.update = (time, rise = 0) => {
-    const ease = 1 - Math.pow(1 - Math.min(1, rise), 3);
-    root.position.set(Math.sin(time * .85) * .43, Math.cos(time * .63) * .29, ease * 17.5);
+    const ease = 1 - Math.pow(1 - Math.min(1, rise), 3), p = dragonPose(time);
+    root.position.set(p.x, p.y, ease * 26);
     root.rotation.z = ease * Math.PI * 1.35;
-    head.rotation.set(Math.sin(time * .6) * .06, Math.sin(time * .92) * .07, Math.sin(time * .47) * .09);
-    glow.intensity = .55 + .16 * Math.sin(time * 1.5) + rise * 2;
+    // Very small motion: the head is massive. The shared brow supplies the collision slopes.
+    head.rotation.set(Math.sin(time * .6) * .009, Math.sin(time * .92) * .012, Math.sin(time * .47) * .018);
+    glow.intensity = 5 + Math.sin(time * 1.5) + rise * 5;
   };
   return root;
 }

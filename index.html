@@ -3,52 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <meta name="theme-color" content="#07111b" />
+  <meta name="theme-color" content="#091324" />
   <title>水晶之井 · Crystal Well</title>
-  <meta name="description" content="A crystal dragon is sealed deep inside a well. Catch the magic ball, shatter the seal." />
+  <meta name="description" content="Release the crystal dragon sealed inside a magical well." />
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   <link rel="stylesheet" href="./src/styles.css" />
-  <link rel="stylesheet" href="./src/luminous.css" />
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
-    }
-  }
-  </script>
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"}}</script>
 </head>
 <body>
   <div id="app" aria-label="水晶之井，三维打砖块游戏">
-    <section id="main-panel" class="game-panel" aria-label="俯视井口，移动鼠标或手指控制圆盾">
-      <div class="topline">
-        <div id="lives" class="lives" aria-label="魔法球剩余数量"></div>
-        <div class="top-actions">
-          <button id="pause" class="icon-btn" aria-label="暂停" title="暂停 / P"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="when-playing" d="M8 5v14M16 5v14"/><path class="when-paused" d="m9 5 10 7-10 7z"/></svg></button>
-          <button id="sound" class="icon-btn" aria-label="关闭声音" title="声音"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10h4l5-4v12l-5-4H5zM17 9q3 3 0 6"/><path class="muted-mark" d="M4 4l16 16"/></svg></button>
-          <button id="restart" class="icon-btn" aria-label="重新开始" title="重新开始 / R"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9a8 8 0 1 1-1 6M5 3v6h6"/></svg></button>
-        </div>
-      </div>
-      <div id="start-hint" class="start-hint" aria-hidden="true"><div class="start-gem"><span class="drop-orb"></span></div></div>
-      <button id="end-overlay" class="end-overlay" type="button" aria-label="再来一次" data-state="lost"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M51 32A19 19 0 1 1 43 17M43 8v11H32"/></svg></button>
-      <div class="bottomline">
-        <div class="progress-disc" id="progress-ring" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="封印清除进度">
-          <div class="progress-core" aria-hidden="true"><span class="progress-gem"></span></div>
-        </div>
-        <span class="sr-only" id="progress-readout">0</span>
-      </div>
-      <output id="fps-readout" class="fps-readout" aria-label="实测渲染帧率"><b>— FPS</b><small>侧 —</small></output>
-    </section>
-    <aside id="side-panel" class="side-panel" aria-label="低帧率的井体半透视侧视图">
-      <div class="side-bottom" aria-hidden="true">
-        <span id="view-refresh" class="view-refresh"></span>
-      </div>
-    </aside>
-    <div id="error-panel" class="error-panel" hidden></div>
-  </div>
-  <div class="portrait-gate" aria-live="polite">
-    <div class="rotate-art" aria-hidden="true"><svg viewBox="0 0 90 90"><rect x="31" y="19" width="31" height="52" rx="6"/><path d="M25 26a33 33 0 0 0-4 33m0 0-6-11m6 11 10-8M66 62a33 33 0 0 0 3-31m0 0 8 10m-8-10-10 6"/></svg></div>
-    <span>请横屏游玩</span>
+    <section id="main-panel" aria-label="俯视井口，移动鼠标或拖动控制圆盾，点按或空格发射，Escape暂停"></section>
+    <aside id="side-panel" aria-label="低帧率侧视图"></aside>
+    <!-- Accessible hit areas only. All visible buttons, numbers and indicators are actual 3D meshes. -->
+    <button id="pause" class="hit-target" aria-label="暂停或继续" title="Esc"></button>
+    <button id="sound" class="hit-target" aria-label="关闭声音"></button>
+    <button id="restart" class="hit-target" aria-label="重新开始"></button>
+    <button id="center-action" class="hit-target" aria-label="继续" hidden></button>
+    <output id="fps-readout" class="sr-only" aria-label="实测渲染帧率">0 FPS</output>
+    <output id="game-status" class="sr-only" aria-live="polite"></output>
+    <div class="portrait-gate sr-only" aria-live="polite">请横屏游玩</div>
+    <div id="error-panel" hidden></div>
   </div>
   <script type="module" src="./src/main.js"></script>
 </body>
