@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { QUALITY } from './quality.js';
 
 // Bounded, pooled magic motes. No per-particle Mesh or draw call.
-const CAPACITY = 520;
+const CAPACITY = QUALITY.particles;
 export function createGlowTexture() {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
   const ctx = canvas.getContext('2d');
@@ -60,7 +61,7 @@ export class MagicMotes {
     this.object.geometry.attributes.aAlpha.needsUpdate = true;
   }
 
-  emit(x, y, z, count = 1, burst = false, hue = 'ice') {
+  emit(x, y, z, count = 1, burst = false, hue = 'ice', downward = false) {
     const color = Array.isArray(hue) ? new THREE.Color().setRGB(...hue, THREE.SRGBColorSpace).toArray() : hue === 'pink' ? [1, .42, .8] : hue === 'gold' ? [1, .82, .48] : [.36, .86, 1];
     for (let n = 0; n < count; n++) {
       const i = this.pointer++ % CAPACITY;
@@ -73,7 +74,7 @@ export class MagicMotes {
       this.positions[j + 2] = z + (Math.random() - .5) * .18;
       p.vx = Math.cos(angle) * speed;
       p.vy = Math.sin(angle) * speed;
-      p.vz = (Math.random() - .25) * speed;
+      p.vz = downward ? -(2 + Math.random() * 3) : (Math.random() - .25) * speed;
       p.max = (burst ? .9 : .52) * (.6 + Math.random());
       p.life = p.max;
       this.alpha[i] = .7; this.sizes[i] = burst ? 2.1 + Math.random() * 2.5 : 1.35 + Math.random() * 1.6;

@@ -1,43 +1,43 @@
 # 水晶之井 · Crystal Well
 
-A playable, almost wordless, desktop / landscape-mobile 3D brick breaker. An Eastern-style crystal dragon sleeps under eight **solid layers of breakable crystal bricks** in a stone well. Catch the returning magical ball with a round shield above the opening; break the crystals and release the dragon.
+A nearly wordless desktop / landscape-mobile 3D brick breaker. A giant Eastern crystal dragon is sealed under eight **solid layers of crystal bricks**. Catch the returning ball with a circular shield above the well, collect rising magic bubbles, and break the seal to release the dragon.
 
 ## Play
 
-The game is **static**: no account, keys, server, build system, or development UI is needed. Serve the repository root over HTTP and open its URL in a modern WebGL2 browser.
+The game is static: no account, API key, backend or build step. Serve the repository root over HTTP in a modern WebGL2 browser:
 
 ```bash
 python3 -m http.server 8000
-# open http://localhost:8000
 ```
 
-It uses a pinned [Three.js](https://threejs.org/) ES module (`0.187.0`) from jsDelivr, so an internet connection is needed on initial load. GitHub Pages, Vercel, or any static host can serve the same files directly. For offline distribution, vendor Three.js locally and update the import map in `index.html`.
+Open `http://localhost:8000`. Three.js `0.187.0` is pinned in the import map and loaded from jsDelivr; an initial internet connection is required. An offline distribution may vendor the same version and update the import map. Preserve `.openai/hosting.json` when deploying.
 
-**Controls:** move the pointer or drag a finger within the large top-down view to move the circular shield in XY; tapping/clicking sends the first orb downward early. Keyboard: arrows or WASD to move, Space to launch, P/Esc to pause, R to restart. All of these are optional; the orb launches automatically after a short visual cue. Portrait layout shows a rotate-device prompt instead of a squeezed game. The small controls use icons rather than explanatory copy.
+Move the mouse or drag a finger in the main view to move the shield. Click/touch-release or **Space** launches a held ball. **Esc** pauses/resumes; P also works. Arrows/WASD move the shield; R restarts. Portrait shows a rotating 3D phone prompt instead of a cramped game.
 
-## Implementation and performance
+Normal shield contact rebounds immediately. Only the purple bind pickup enables capture. New-life serves and captured balls both wait for explicit release: cyan crystal petals mean a new ball, purple petals mean a captured ball. A pulsing sculpted launch symbol marks the held state. Missing a ball briefly leaves the shield empty before a replacement appears. There are **three lives**.
 
-- `src/physics.js`: deterministic fixed-step 3D sphere-vs-voxel, circular stone wall, 2D XY shield plane, moving dragon forehead **height-field collider**. Rendering never drives the physics.
-- `src/world.js`: one instanced mesh for the roughly 2,000 beveled semi-transparent brick bodies, one sparse instanced gemstone overlay, 3D stone rim, procedural dark wilderness, drifting well-wall glows, 2 real moving point lights, magic shield and persistent ball-location ghost seen **only from above**.
-- `src/dragon.js`: original stylized Eastern crystal dragon mesh (antlers, snout, whiskers, eyes, coiled body), with independent lightweight gameplay collider. The whole model is replaceable.
-- `src/vfx.js`: 330 pooled magic motes in one draw call, additive glows and chip bursts. Particle counts are bounded.
-- `src/main.js`: main orthographic clear top view every display frame; the half-perspective side view renders to a **low-resolution WebGLRenderTarget at 18 FPS desktop / 14 FPS touch**, then blits its cached texture cheaply every main frame. One WebGL context, one renderer.
+## Current version: v0.3
 
-Crystal transparency is a **stylized approximation**, not physically accurate per-crystal refraction. This controls transparency overdraw, which is the main rendering risk. The secondary view remains intentionally lower resolution and framerate. Every defeated voxel disappears from the existing instanced mesh without generating hundreds of individual mesh objects.
+- Detailed stepped crystal coping, inset gems, leaf reliefs and supporting corbels.
+- Original sculpted Eastern dragon head, about **88% of the opening width**: branching antlers, long muzzle, eyes, brows, mane, scales and swept whiskers. A shared, inexpensive forehead height field handles collisions.
+- Every visible button and HUD element is a **3D mesh**, including score, FPS, lives and orientation prompt. Empty HTML buttons are accessible hit areas only. No fine outlines or SVG HUD.
+- Scoring, up to ×4 hit chains, clear/life bonuses and four rising pickups: wide shield, slow ball, capture charges, treasure.
+- Explicit **2× resource allocation** for main/side pixel area, particle pool and reflection texture. This is not a claim of exactly doubled GPU time. The side view remains cached at 18 Hz desktop / 14 Hz touch, and real FPS stays visible.
+- Original well dimensions and front notch retained: 20×20 grid clipped to a circle, eight filled layers, **1,926 crystals**. Main camera is 20° off vertical, with a 240-second orbit and orthogonal secondary view.
 
-The initial level's **front (-Y) surface contains a concave notch several voxels deep**. The grid is genuinely filled radially from center to outer layer and along eight height layers; it is not a single hollow cylindrical band. Crystal damage spreads in small local fractures, with late-stage resonance pulses to avoid laborious cleanup. Victory is triggered only when the level's crystals have all been removed (a tiny last cluster collapses together), causing the crystal dragon to rise from the well.
+Detailed rules and acceptance criteria: [design contract](docs/DESIGN.md) and [v0.3 art/gameplay revision](docs/V03-GAMEPLAY-AND-ART.md).
 
-## Development checks
+## Implementation
+
+`physics.js` is the deterministic collision kernel. Production uses `AdventureGame` in `gameplay.js` for lives, scoring, pickups and explicit serve/capture states. `royal-presentation.js` extends the existing instanced crystal renderer; `hud-3d.js` renders the model HUD with the same WebGL context. Static dragon and coping components are merged by material, and bubbles/particles are pooled. Crystal optics are a stylized approximation, not per-crystal ray tracing.
 
 ```bash
-npm test       # Node's built-in unit runner; no npm install required
-npm run check  # JavaScript parse checks; no npm install required
+npm run check
+npm test
 ```
 
-The WebGL rendering path still needs visual/performance QA in a device browser. Suggested acceptance checks: readable ball and shield in the top view even through eight crystal layers; original concavity visible from the side; 60 FPS target on ordinary desktop and 14–18 FPS side refresh; correct capture/miss and no ball tunneling; comfortable thumb input in landscape mobile; dragon eruption and no uncaught WebGL errors. No specific FPS claim is made before device testing.
+These require Node but no npm dependencies. CI additionally installs the pinned Three.js and Playwright packages, runs a Chromium WebGL smoke test, and uploads screenshots plus `browser-report.json` as `visual-smoke`. CI uses SwiftShader; its FPS is **not** a desktop or phone hardware benchmark. Real-device performance still needs testing.
 
-## Asset policy
+## Assets
 
-All geometry, particles, glyphs, textures, and UI are created in this repository's code, rather than bundling third-party meshes. For later dragon-art upgrades, a promising **CC0** source is [Quaternius Animated Monster Pack](https://quaternius.com/packs/animatedmonster.html), also catalogued as [Dragon at Poly Pizza](https://poly.pizza/m/VBvzjFIYws). Its design is western/cartoonish; the original in-code placeholder intentionally uses a more elongated Eastern dragon silhouette. If replacing it with an external model, first verify that the *specific* file is CC0, document source and license, and normalize its scale/orientation. The runtime collider should remain the cheap height field.
-
-Three.js © contributors, MIT License, loaded as a third-party dependency (not copied into this repository).
+All models, textures, symbols and particles are generated by this repository's code; no external art is bundled. Three.js is a third-party MIT-licensed dependency. The detailed dragon mesh is deliberately separate from its simplified physics envelope.

@@ -1,29 +1,35 @@
-# Crystal Well — first-playable design contract
+# Crystal Well — current design contract (v0.3)
 
-## Player-visible contract
+## Player-facing experience
 
-No developer-facing explanation text in the game, no tutorial panels. Visual hierarchy: **primary transparent orthographic top view** with the magical ball position always legible and a player-controlled circular shield; **secondary half-perspective view** shows the stacked levels, notch, the dragon at the bottom, and the depth of the projectile. HUD is only three life crystals, seal-removal ring, and small pause/audio/reset icons.
+Almost no explanatory text. All visible buttons, numbers, life crystals, progress clusters, effect symbols and portrait prompt are three-dimensional models. Transparent DOM controls exist for accessibility and input only. No fine outlines, wireframes or SVG HUD.
 
-Desktop and mobile landscape only. Portrait displays a single orientation pictogram and brief prompt. Pointer/touch directly moves the shield across the X/Y disk. A dot of light at the top projection indicates the magical ball even when it is buried in crystals; a pale ring offers an approximate landing hint when it approaches the opening (not a promised collision-accurate prediction).
+Desktop and phone landscape only. The primary orthographic camera is tilted 20° from vertical and rotates once in 240 seconds. The secondary perspective camera stays orthogonal and updates at 18 Hz desktop / 14 Hz touch. Main view controls the shield; side view supplements depth. Ball heat color encodes distance from the opening, not camera distance.
 
-## Geometry / mechanics
+## Space and collisions
 
-- Circular well, radius 9.72 units; grid spans 20×20 one-unit cells in XY, eight stacked Z levels, filled to radius 9.1. There are many radial layers of bricks, not merely an outer wall.
-- The face toward the player is -Y in world coordinates. A deterministic multi-height notch opens from that side, and the top lip has a connected concavity.
-- Circular shield radius 1.32 at Z=10.55, moves in X/Y, reflects upward-traveling ball **down into the well**. Miss = ball leaves the well at the opening and breaks; three lives.
-- Ball begins near front notch, glows, leaves a capped particle trail. Wall bounces are safe, but exiting the top without the shield is not.
-- Bottom dragon forehead is a slowly moving non-planar height field with normal-based reflection. Outside its forehead, the well floor also returns a ball. No detailed mesh collider required.
-- Crystals are broken by a collision and a small local fracture. Resonance periodically spreads through nearby rows. Endgame collapses a negligible last cluster, leaving **zero** crystals; then an animated dragon rises from the well.
+The well radius is 9.72. A 20×20 grid clipped to radius 9.1 holds eight vertical crystal layers: 1,926 occupied cells, including many radial layers. The front (-Y) has a connected, multi-height notch. This is a filled cylinder, not a thin barrel.
 
-## Render budget / quality knobs
+The circular shield is at Z=10.55, base radius 1.32, and moves in XY. Upward balls that contact it rebound downward. Missing the opening costs one of three lives. Well-wall and floor bounces are safe. The giant dragon head is almost as wide as the opening; its brow uses a moving height field rather than detailed mesh collision.
 
-- 1 instanced material for crystal bodies and 1 sparse accent mesh; no independent draw call per brick. Side wall lights are primarily sprite fakes; two actual moving lights provide modulation. Avoid MeshPhysicalMaterial transmission on thousands of crystals.
-- Top-down view renders once per frame at capped DPR 1.35–1.65. Side view is **cached in a render target**, refreshed at 18 Hz on desktop / 14 Hz on touch, rendered at ~85% CSS panel resolution with a cap of 540×760 pixels. It is composited every frame as a single textured quad.
-- Ball top silhouette is a separate camera layer to keep readability even if crystal alpha stack would obscure it; side camera excludes this layer. Visual representation can therefore diverge slightly from true optical occlusion (intentional gameplay aid).
-- Pooled particles: 330; no shadow maps or SSR. All decorative lights have capped count. Crystal opacity initially .20, tunable after actual device tests.
+Local fracture, periodic resonance and a small final collapse remove crystals. Victory requires zero crystals, followed by the full dragon's rise. The restart model waits until the reveal animation has been shown.
 
-## Future improvements, not prerequisites
+## Controls and state feedback
 
-- Replace the procedural head with a locally stored, verified-license GLB, perhaps including a full serpentine animation. Keep gameplay collision independent from mesh triangles.
-- Image-to-voxel brick art generator, level selection, multiple seal patterns and special crystal fracture types.
-- Browser benchmark / visual regression, adjustable quality presets and context-restoration QA.
+Pointer movement / touch drag moves the shield; click-release, touch-release or Space launches a held ball. Esc toggles pause without key-repeat toggles; P is compatible, R restarts, arrows/WASD move. Losing focus pauses.
+
+Ordinary shield contact is an immediate rebound with shield compression and downward particles. A miss destroys the ball and leaves the shield empty for about 0.85 seconds before a cyan-petal replacement appears. Bind magic alone causes a catch, shown by purple petals, charge gems and a pulsing launch symbol. Both held states wait for explicit input; neither silently auto-launches.
+
+## Score and pickups
+
+Each actually removed crystal scores 10 points, with a hit-chain multiplier up to ×4. Automatic resonance and tail collapse score at base rate. Clear bonus: 1,000 plus 500 per remaining life, once only. Restart clears score/effects and restores exactly three lives.
+
+Pickups are rising iridescent magic bubbles with solid symbols inside. They must overlap the shield at the opening. Missed bubbles cost no life. Wide increases the actual shield radius ×1.5 for 18 seconds; slow changes actual speed ×0.72 for 14 seconds; bind grants two capture charges (cap three); treasure gives 500 points. Other pickups give 100 points. Timers tick only while the ball flies. A miss clears magic.
+
+## Rendering contract
+
+The v0.3 quality profile gives main and side targets approximately twice the v0.2 pixel allocation, doubles the particle pool to 1,040 and doubles reflection-map pixels. Side refresh remains deliberately low. This is a budget, not a guaranteed frame-time ratio. No silent automatic quality reduction.
+
+Crystals use instanced geometry, exposed-face shading, separate sorted main/side instance buffers and hybrid optical effects. Coping and dragon detail are merged by material. Magic bubbles and motes have fixed pools. HUD uses an orthographic model scene in the same renderer. FPS is measured from actual frame timestamps, not fixed physics time.
+
+Detailed numeric choices and verification notes: [v0.3 revision](V03-GAMEPLAY-AND-ART.md). The older [visual revision](VISUAL-REVISION.md) records v0.2 history; current rules take precedence.

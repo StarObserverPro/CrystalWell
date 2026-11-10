@@ -1,3 +1,5 @@
+import { dragonBrow } from './dragon-shape.js';
+
 /** Crystal Well: deterministic, renderer-independent 3D arcade simulation. */
 export const RULES = Object.freeze({
   cells: 20, levels: 8, cell: 1,
@@ -80,7 +82,7 @@ export class CrystalWellGame {
   drainEvents() { const current = this.events; this.events = []; return current; }
 
   aim(x, y) {
-    const safeRadius = RULES.wellRadius - RULES.shieldRadius - 0.08;
+    const safeRadius = RULES.wellRadius - (this.activeShieldRadius || RULES.shieldRadius) - 0.08;
     const len = Math.hypot(x, y);
     const f = len > safeRadius ? safeRadius / len : 1;
     this.shield.targetX = x * f;
@@ -140,7 +142,7 @@ export class CrystalWellGame {
     // The shield spans a finite XY disk at the well opening.
     if (b.vz > 0 && oldZ + b.radius <= RULES.shieldZ && b.z + b.radius >= RULES.shieldZ) {
       const dx = b.x - this.shield.x, dy = b.y - this.shield.y;
-      if (Math.hypot(dx, dy) <= RULES.shieldRadius + b.radius * 0.55) {
+      if (Math.hypot(dx, dy) <= (this.activeShieldRadius || RULES.shieldRadius) + b.radius * 0.55) {
         b.z = RULES.shieldZ - b.radius - 0.003;
         b.vx = clamp(b.vx * 0.54 + dx * 2.0 + this.shield.vx * 0.055, -4.4, 4.4);
         b.vy = clamp(b.vy * 0.54 + dy * 2.0 + this.shield.vy * 0.055, -4.4, 4.4);
@@ -156,17 +158,12 @@ export class CrystalWellGame {
     if (b.z - b.radius > RULES.shieldZ + 0.48) { this.loseBall(); return; }
 
     // Dragon = cheap moving height field, NOT a detailed mesh collider.
-    const dragonX = Math.sin(this.time * 0.85) * 0.43;
-    const dragonY = Math.cos(this.time * 0.63) * 0.29;
-    const rx = b.x - dragonX, ry = b.y - dragonY;
-    const onBrow = (rx / 3.1) ** 2 + (ry / 2.55) ** 2 < 1;
-    const headSurface = 0.89 + 0.14 * Math.cos(rx * 1.5) + 0.19 * Math.sin(ry * 1.8 + this.time * 0.8);
-    if (b.vz < 0 && b.z - b.radius <= (onBrow ? headSurface : 0.3)) {
-      b.z = (onBrow ? headSurface : 0.3) + b.radius + 0.002;
-      if (onBrow) {
-        const n = normalize(0.21 * Math.sin(rx * 1.5), -0.342 * Math.cos(ry * 1.8 + this.time * 0.8), 1);
-        this.reflect(n.x, n.y, n.z);
-        b.vx += Math.cos(this.time * 0.85) * 0.28;
+    const brow = dragonBrow(b.x, b.y, this.time);
+    if (b.vz < 0 && b.z - b.radius <= brow.z) {
+      b.z = brow.z + b.radius + 0.002;
+      if (brow.inside) {
+        this.reflect(brow.nx, brow.ny, brow.nz);
+        b.vx += Math.cos(this.time * .85) * .28;
         this.events.push({ type: 'dragon', x: b.x, y: b.y, z: b.z });
       } else { b.vz = Math.abs(b.vz); this.events.push({ type: 'floor', x: b.x, y: b.y, z: b.z }); }
       this.setSpeed();
@@ -257,7 +254,7 @@ export class CrystalWellGame {
     const b = this.ball;
     if (Math.abs(b.vz) < 1.9) b.vz = (b.vz < 0 ? -1 : 1) * 1.9;
     const l = Math.hypot(b.vx, b.vy, b.vz) || 1;
-    const speed = RULES.ballSpeed + Math.min(1.1, this.hits * 0.004);
+    const speed = (RULES.ballSpeed + Math.min(1.1, this.hits * 0.004)) * (this.speedFactor ?? 1);
     b.vx *= speed / l; b.vy *= speed / l; b.vz *= speed / l;
   }
 

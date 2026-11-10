@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { QUALITY } from './quality.js';
 import { CrystalWorld } from './world.js';
 import { RULES, brickPosition } from './physics.js';
 import { depthHeat } from './visual-math.js';
@@ -87,11 +88,11 @@ export class LuminousCrystalWorld extends CrystalWorld {
       cursor.rotation.set(0,0,(j+(k%2)*.5)*Math.PI*2/40);cursor.updateMatrix();wall.setMatrixAt(k*40+j,cursor.matrix);
     }
     wall.renderOrder=0;scene.add(wall);
-    const coping = new THREE.InstancedMesh(arcBlock(9.64,10.76,Math.PI*2/64,.36,.065),
-      pbr(0xb0c5d7,{metalness:.48,roughness:.22}),64);
+    const coping = new THREE.InstancedMesh(arcBlock(9.64,10.76,Math.PI*2/QUALITY.rimSegments,.36,.065),
+      pbr(0xb0c5d7,{metalness:.48,roughness:.22}),QUALITY.rimSegments);
     coping.name='Thick, segmented well coping';
-    for(let j=0;j<64;j++) {
-      cursor.position.set(0,0,RULES.shieldZ+.12);cursor.rotation.set(0,0,j*Math.PI*2/64);cursor.updateMatrix();
+    for(let j=0;j<QUALITY.rimSegments;j++) {
+      cursor.position.set(0,0,RULES.shieldZ+.12);cursor.rotation.set(0,0,j*Math.PI*2/QUALITY.rimSegments);cursor.updateMatrix();
       coping.setMatrixAt(j,cursor.matrix);
       coping.setColorAt(j,new THREE.Color(j%8===0?0x8ca5c4:j%2?0xe0eef0:0x9bc9de));
     }
@@ -199,17 +200,17 @@ export class LuminousCrystalWorld extends CrystalWorld {
       new THREE.Vector2(.84,.11),new THREE.Vector2(1.22,.015),new THREE.Vector2(1.26,-.10),
       new THREE.Vector2(.8,-.16),new THREE.Vector2(0,-.19)];
     const lens=mesh(new THREE.LatheGeometry(points,24),ice,root);lens.rotation.x=Math.PI/2;
-    const tor=mesh(new THREE.TorusGeometry(RULES.shieldRadius-.035,.082,8,72),silver,root);
-    const inner=mesh(new THREE.TorusGeometry(.92,.025,6,64),pbr(0xafd7fb,{emissive:0x246d8f,emissiveIntensity:.55}),root,0,0,.15);
+    const tor=mesh(new THREE.TorusGeometry(RULES.shieldRadius-.035,.12,12,96),silver,root);
+    const inner=mesh(new THREE.TorusGeometry(.92,.09,10,80),pbr(0xafd7fb,{emissive:0x246d8f,emissiveIntensity:.55}),root,0,0,.15);
     const boss=mesh(new THREE.OctahedronGeometry(.34,1),gem,root,0,0,.24);boss.scale.set(1,1,.75);
-    const inset=mesh(new THREE.TorusGeometry(.39,.033,6,40),silver,root,0,0,.20);
+    const inset=mesh(new THREE.TorusGeometry(.39,.08,10,56),silver,root,0,0,.20);
     inset.rotation.z=.15;
     const runeGroup=new THREE.Group();root.add(runeGroup);
     for(let i=0;i<12;i++) {
       const a=i*Math.PI*2/12;
       const spoke=mesh(new THREE.OctahedronGeometry(1,0),i%3===0?gem:silver,runeGroup,
         Math.cos(a)*.76,Math.sin(a)*.76,.18);
-      spoke.scale.set(.40,.045,.055);spoke.rotation.z=a;
+      spoke.scale.set(.40,.11,.09);spoke.rotation.z=a;
       const tip=mesh(new THREE.OctahedronGeometry(1,0),i%3===0?gem:ice,root,
         Math.cos(a)*1.19,Math.sin(a)*1.19,.07);
       tip.scale.set(.23,.11,.15);tip.rotation.z=a;
