@@ -131,7 +131,7 @@ export class LuminousCrystalWorld extends CrystalWorld {
   makeCrystalField() {
     this.records=[]; this.fieldVersion=0;
     const random=rng(8401), cursor=new THREE.Object3D();
-    const palette=[0x389ecf,0x688ddf,0x43c4b4,0x977acb,0x83c8df];
+    const palette=[0x4da9cd,0x74a8d4,0x65c3c9,0x969acb,0x9ccedf];
     for(let id=0;id<this.game.grid.length;id++) {
       if(!this.game.grid[id]) continue;
       const k=Math.floor(id/(RULES.cells*RULES.cells)), rem=id%(RULES.cells*RULES.cells);

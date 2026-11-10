@@ -1,0 +1,51 @@
+{
+  "slug": "chinese-dragon",
+  "triangles": 800000,
+  "texture_px": 4096,
+  "triangles_light": 399999,
+  "texture_px_light": 1024,
+  "files": {
+    "glb": {
+      "name": "chinese-dragon.glb",
+      "bytes": 30352284
+    },
+    "blend": {
+      "name": "chinese-dragon.blend",
+      "bytes": 37459029
+    },
+    "fbx": {
+      "name": "chinese-dragon.fbx",
+      "bytes": 52664444
+    },
+    "obj": {
+      "name": "chinese-dragon-obj.zip",
+      "bytes": 24647111
+    },
+    "usdz": {
+      "name": "chinese-dragon.usdz",
+      "bytes": 47284373
+    },
+    "glb_light": {
+      "name": "chinese-dragon-light.glb",
+      "bytes": 13100384
+    },
+    "fbx_light": {
+      "name": "chinese-dragon-light.fbx",
+      "bytes": 25722844
+    }
+  },
+  "extras": {
+    "license": "CC0-1.0",
+    "source": "grab3d.com",
+    "dimensions_m": "3.277 x 7.998 x 6.061",
+    "triangles": 800000,
+    "variant": "download",
+    "generator": "Created by grab3d",
+    "created": "2026-09-28"
+  },
+  "origin": {
+    "method": "ai-assisted",
+    "detail": "Base mesh and textures generated with an AI image-to-3D tool (Meshy), then cleaned up, scaled, textured and checked in Blender.",
+    "ai_content": true
+  }
+}

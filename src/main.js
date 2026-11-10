@@ -3,7 +3,8 @@ import { RULES, clamp } from './physics.js';
 import { AdventureGame } from './gameplay.js';
 import { QUALITY, pixelRatio, sideTargetSize } from './quality.js';
 import { SculptedHUD } from './hud-3d.js';
-import { RoyalCrystalWorld as CrystalWorld } from './royal-presentation.js';
+import { RefinedCrystalWorld as CrystalWorld } from './refined-world.js';
+import { composition } from './composition.js';
 import { viewBasis, depthHeat, FrameMeter } from './visual-math.js';
 import { MagicMotes } from './vfx.js';
 
@@ -43,6 +44,11 @@ const scene = new THREE.Scene();
 let world = new CrystalWorld(scene, game);
 const vfx = new MagicMotes(scene);
 const hud = new SculptedHUD(renderer, game, elements);
+hud.scene.environment=scene.environment;
+let assetsReady=false;
+world.dragon.userData.readyPromise.then(()=>{ assetsReady=true; }).catch(error=>{
+  paused=true;errorPanel.hidden=false;errorPanel.textContent='龙模型加载失败，请刷新重试';console.error(error);
+});
 const topCamera = new THREE.OrthographicCamera(-13, 13, 12, -12, .1, 150);
 topCamera.position.set(0, 0, 32);
 topCamera.up.set(0, 1, 0);
@@ -63,7 +69,7 @@ const screenCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 10);
 screenCamera.position.z = 2;
 const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2),
   new THREE.MeshBasicMaterial({ map: sideTarget.texture, depthTest: false, depthWrite: false,
-    toneMapped: false }));
+    toneMapped: false, color:0xc4d0e2 }));
 screenScene.add(quad);
 
 let paused = false;
@@ -77,6 +83,7 @@ let lastHudUpdate = 0;
 let lastMoteTime = 0;
 let lastWinBurst = 0;
 let width = 1, height = 1, mainWidth = 1, sideWidth = 1;
+let sideHeight = 1;
 let sideFps = 18;
 let sideDistance = 40;
 const cameraTarget = new THREE.Vector3(0, 0, 5.3);
@@ -123,24 +130,26 @@ function resize() {
   const bounds = app.getBoundingClientRect();
   width = Math.max(1, Math.floor(bounds.width));
   height = Math.max(1, Math.floor(bounds.height));
-  mainWidth = Math.max(1, Math.round(mainPanel.getBoundingClientRect().width));
-  sideWidth = Math.max(1, width - mainWidth);
+  const layout=composition(width,height);
+  mainWidth=layout.mainWidth;sideWidth=layout.sideWidth;
+  mainPanel.style.width=`${mainWidth}px`;sidePanel.style.left=`${mainWidth}px`;
   renderer.setSize(width, height, false);
   playingLandscape = window.innerWidth > window.innerHeight;
   const aspect = mainWidth / height;
-  const halfHeight = Math.max(13.7, 12.3 / aspect);
+  const halfHeight = layout.halfHeight;
   topCamera.left = -halfHeight * aspect;
   topCamera.right = halfHeight * aspect;
-  topCamera.top = halfHeight;
-  topCamera.bottom = -halfHeight;
+  topCamera.top = halfHeight + layout.centerY;
+  topCamera.bottom = -halfHeight + layout.centerY;
   topCamera.updateProjectionMatrix();
-  const sideAspect = sideWidth / height;
-  const [tw, th] = sideTargetSize(sideWidth, height);
+  sideHeight = Math.max(1,height-(height<550?54:76));
+  const sideAspect = sideWidth / sideHeight;
+  const [tw, th] = sideTargetSize(sideWidth, sideHeight);
   sideTarget.setSize(tw, th);
   sideCamera.aspect = tw / th;
   sideCamera.updateProjectionMatrix();
   const fovRads = THREE.MathUtils.degToRad(sideCamera.fov);
-  const distance = Math.max(31, 21.5 / (2 * Math.tan(fovRads / 2) * sideAspect));
+  const distance = Math.max(34, 24.0 / (2 * Math.tan(fovRads / 2) * sideAspect));
   sideDistance = distance;
   updateCameras();
   frameMeter.reset();
@@ -155,8 +164,9 @@ function updateCameras() {
   topCamera.position.fromArray(basis.main).multiplyScalar(36).add(cameraTarget);
   topCamera.up.fromArray(basis.up);
   topCamera.lookAt(cameraTarget); topCamera.updateMatrixWorld(true);
-  sideCamera.position.fromArray(basis.side).multiplyScalar(sideDistance).add(cameraTarget);
-  sideCamera.lookAt(cameraTarget); sideCamera.updateMatrixWorld(true);
+  const sideFocus=new THREE.Vector3(0,0,.3);
+  sideCamera.position.fromArray(basis.side).multiplyScalar(sideDistance).add(sideFocus);
+  sideCamera.lookAt(sideFocus); sideCamera.updateMatrixWorld(true);
 }
 function reprojectPointer() {
   if (!lastPointer || !playingLandscape || paused) return;
@@ -175,7 +185,7 @@ mainPanel.addEventListener('pointerleave', () => { lastPointer = null; });
 mainPanel.addEventListener('pointercancel', () => { lastPointer = null; pointerGesture = null; });
 mainPanel.addEventListener('pointermove', e => { if (!paused) aimFromPointer(e); });
 mainPanel.addEventListener('pointerdown', e => {
-  if (paused || !playingLandscape || e.target.closest('button') || e.button !== 0 || !e.isPrimary) return;
+  if (!assetsReady || paused || !playingLandscape || e.target.closest('button') || e.button !== 0 || !e.isPrimary) return;
   document.activeElement?.blur?.();
   pointerGesture = { id: e.pointerId, held: game.held, heldSince: game.heldSince };
   initAudio(); mainPanel.setPointerCapture?.(e.pointerId); aimFromPointer(e);
@@ -183,7 +193,7 @@ mainPanel.addEventListener('pointerdown', e => {
 mainPanel.addEventListener('pointerup', e => {
   if (mainPanel.hasPointerCapture?.(e.pointerId)) mainPanel.releasePointerCapture(e.pointerId);
   const gesture = pointerGesture; pointerGesture = null;
-  if (!paused && playingLandscape && game.held && gesture?.id === e.pointerId
+  if (assetsReady && !paused && playingLandscape && game.held && gesture?.id === e.pointerId
       && gesture.held && gesture.heldSince === game.heldSince) game.launch();
   if (e.pointerType !== 'mouse') lastPointer = null;
 });
@@ -199,7 +209,7 @@ window.addEventListener('keydown', event => {
   if (paused || !playingLandscape) return;
   keys.add(event.key.toLowerCase());
   if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','s','d','w'].includes(event.key)) lastPointer = null;
-  if (event.key === ' ' && game.held && !event.repeat) { initAudio(); game.launch(); }
+  if (assetsReady && event.key === ' ' && game.held && !event.repeat) { initAudio(); game.launch(); }
 });
 window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 window.addEventListener('blur', () => setPaused(true));
@@ -296,7 +306,7 @@ function render(now) {
     renderer.setScissorTest(true); renderer.setViewport(0,0,mainWidth,height);renderer.setScissor(0,0,mainWidth,height);
     world.prepareView(topCamera,false,now);renderer.render(scene,topCamera);
     sideRendered=renderSide(now)===true;
-    renderer.setScissorTest(true);renderer.setViewport(mainWidth,0,sideWidth,height);renderer.setScissor(mainWidth,0,sideWidth,height);
+    renderer.setScissorTest(true);renderer.setViewport(mainWidth,0,sideWidth,sideHeight);renderer.setScissor(mainWidth,0,sideWidth,sideHeight);
     renderer.clearDepth();renderer.render(screenScene,screenCamera);
   }
   updateHud(now);hud.render();
@@ -313,7 +323,7 @@ function frame(now) {
   previousTime = now;
   if (!playingLandscape) { frameMeter.reset(); render(now); return; }
   updateCameras();
-  if (!paused && !simulationFrozen) {
+  if (assetsReady && !paused && !simulationFrozen) {
     reprojectPointer();
     if (keys.size) {
       const mx = (keys.has('arrowright') || keys.has('d') ? 1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1 : 0);
@@ -354,6 +364,7 @@ requestAnimationFrame(frame);
 
 if (new URLSearchParams(location.search).has('qa')) {
   window.__crystalWell = { game, world, renderer, topCamera, sideCamera, frameMeter, hud, sideTarget, quality: QUALITY, reset,
+    get assetsReady(){return assetsReady;},
     get paused() { return paused; },
     suspendRendering: () => { renderSuspended = true; }, resumeRendering: () => { renderSuspended = false; },
     drawFrame: () => { render(performance.now()); renderer.getContext().finish(); },

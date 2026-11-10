@@ -1,4 +1,6 @@
-# Crystal Well — current design contract (v0.3)
+# Crystal Well — gameplay contract (v0.4)
+
+The [v0.4 visual revision](V04-VISUAL-REBUILD.md) supersedes older art and layout details below. Production uses an externally sourced CC0 dragon, 26 optical rim crystals, a sampled sculpt collision proxy, subject-fitted views and an above-shield held-ball beacon. The game rules are unchanged.
 
 ## Player-facing experience
 
@@ -10,7 +12,7 @@ Desktop and phone landscape only. The primary orthographic camera is tilted 20°
 
 The well radius is 9.72. A 20×20 grid clipped to radius 9.1 holds eight vertical crystal layers: 1,926 occupied cells, including many radial layers. The front (-Y) has a connected, multi-height notch. This is a filled cylinder, not a thin barrel.
 
-The circular shield is at Z=10.55, base radius 1.32, and moves in XY. Upward balls that contact it rebound downward. Missing the opening costs one of three lives. Well-wall and floor bounces are safe. The giant dragon head is almost as wide as the opening; its brow uses a moving height field rather than detailed mesh collision.
+The circular shield is at Z=10.55, base radius 1.32, and moves in XY. Upward balls that contact it rebound downward. Missing the opening costs one of three lives. Well-wall and floor bounces are safe. The external dragon is scaled to a 17.04-unit silhouette across the opening. A coarse moving height field sampled from the imported mesh handles collisions; the triangle mesh is never a per-frame collider.
 
 Local fracture, periodic resonance and a small final collapse remove crystals. Victory requires zero crystals, followed by the full dragon's rise. The restart model waits until the reveal animation has been shown.
 
@@ -18,7 +20,7 @@ Local fracture, periodic resonance and a small final collapse remove crystals. V
 
 Pointer movement / touch drag moves the shield; click-release, touch-release or Space launches a held ball. Esc toggles pause without key-repeat toggles; P is compatible, R restarts, arrows/WASD move. Losing focus pauses.
 
-Ordinary shield contact is an immediate rebound with shield compression and downward particles. A miss destroys the ball and leaves the shield empty for about 0.85 seconds before a cyan-petal replacement appears. Bind magic alone causes a catch, shown by purple petals, charge gems and a pulsing launch symbol. Both held states wait for explicit input; neither silently auto-launches.
+Ordinary shield contact is an immediate rebound with shield compression and downward particles. A miss destroys the ball and leaves the shield empty for about 0.85 seconds before a cyan-petal replacement appears. Bind magic alone causes a catch, shown by a purple ball beacon above the shield, charge gems and a pulsing launch symbol. Cyan is a fresh serve; the physical ball is hidden while held so there is only one ball indicator. Both views render the beacon through occluders. Both held states wait for explicit input; neither silently auto-launches.
 
 ## Score and pickups
 

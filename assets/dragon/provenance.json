@@ -1,0 +1,14 @@
+{
+  "publisher": "Grab3D",
+  "page": "https://grab3d.com/models/creatures/chinese-dragon/",
+  "download": "https://grab3d.com/dl/chinese-dragon/chinese-dragon-light.glb",
+  "license": "CC0-1.0",
+  "sha256": "ce43d3edd9e5e60708a5497f6ef9dac03d1e9aa9a7a6ab6668e6c2c37929727e",
+  "origin": {
+    "method": "ai-assisted",
+    "detail": "Base mesh and textures generated with an AI image-to-3D tool (Meshy), then cleaned up, scaled, textured and checked in Blender.",
+    "ai_content": true
+  },
+  "bytes": 13100384,
+  "note": "External model, not authored by CrystalWell. AI-assisted origin disclosed by publisher."
+}

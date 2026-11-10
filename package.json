@@ -1,6 +1,6 @@
 {
   "name": "crystal-well",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Crystal Well — a magical 3D brick-breaker inside a crystal-filled well",
