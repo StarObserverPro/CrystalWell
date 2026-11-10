@@ -7,6 +7,7 @@ import { composition } from '../src/composition.js';
 import { installDragonSurface,dragonBrow } from '../src/dragon-shape.js';
 import { AdventureGame } from '../src/gameplay.js';
 import { RULES } from '../src/physics.js';
+import { fitDragonPoint,headWeight,isFaceCore } from '../src/dragon-anatomy.js';
 
 test('restart arrow is one non-self-intersecting continuous outline',()=>{
   const p=restartOutline(),cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
@@ -35,13 +36,14 @@ test('external model is bundled, hash-verified and licensed, not the generated h
 test('actual imported sculpt supplies finite collision heights and can still clear the seal',()=>{
   const file=fs.readFileSync('assets/dragon/chinese-dragon-source.glb'),len=file.readUInt32LE(12);
   const data=JSON.parse(file.toString('utf8',20,20+len)),access=data.accessors[0],view=data.bufferViews[access.bufferView];
-  const start=20+len+8+(view.byteOffset||0)+(access.byteOffset||0),pos=[];
+  const start=20+len+8+(view.byteOffset||0)+(access.byteOffset||0),pos=[],weights=[];
   for(let i=0;i<access.count;i++){
     const k=start+i*(view.byteStride||12);
-    pos.push(file.readFloatLE(k)*5.2,(file.readFloatLE(k+4)-3.7)*3.5,1.05+(file.readFloatLE(k+8)-3.999325)*3.7);
+    const x=file.readFloatLE(k),y=file.readFloatLE(k+4),z=file.readFloatLE(k+8),p=fitDragonPoint(x,y,z);
+    if(isFaceCore(x,y,z)&&Math.abs(p[0])<8.65&&Math.abs(p[1])<8.1){pos.push(...p);weights.push(headWeight(x,y,z));}
   }
-  installDragonSurface(pos);
-  for(let y=-8;y<=8;y+=2)for(let x=-8;x<=8;x+=2){const b=dragonBrow(x,y,0);assert.ok(Number.isFinite(b.z+b.nx+b.ny+b.nz));assert.ok(b.z<=1.2);}
+  installDragonSurface(pos,weights);
+  for(let y=-8;y<=8;y+=2)for(let x=-8;x<=8;x+=2){const b=dragonBrow(x,y,0);assert.ok(Number.isFinite(b.z+b.nx+b.ny+b.nz));assert.ok(b.z<=2.3);}
   const g=new AdventureGame();
   for(let i=0;i<120*1200&&g.state!=='won'&&g.state!=='lost';i++){
     if(g.held)g.launch();const b=g.ball,t=b.vz>0?Math.max(0,(RULES.shieldZ-b.z)/b.vz):0;

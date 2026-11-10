@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { QUALITY } from './quality.js';
+import { REFRACTION } from './optics-rules.js';
 import { CrystalWorld } from './world.js';
 import { RULES, brickPosition } from './physics.js';
 import { depthHeat } from './visual-math.js';
@@ -151,6 +152,7 @@ export class LuminousCrystalWorld extends CrystalWorld {
       for (const name of ['aOpenPositive','aOpenNegative']) {
         body.geometry.setAttribute(name,new THREE.InstancedBufferAttribute(new Float32Array(this.records.length*3),3).setUsage(THREE.DynamicDrawUsage));
       }
+      body.geometry.setAttribute('aOpticalTier',new THREE.InstancedBufferAttribute(new Float32Array(this.records.length),1).setUsage(THREE.DynamicDrawUsage));
       body.frustumCulled=false;body.userData.lastSort=-Infinity;body.userData.version=-1;
       // Allocate instanceColor before shader compilation.
       this.records.forEach((r,j)=>{body.setMatrixAt(j,r.matrix);body.setColorAt(j,r.color);});
@@ -179,13 +181,22 @@ export class LuminousCrystalWorld extends CrystalWorld {
     ordered.sort((a,b)=>(b.p.x-a.p.x)*direction.x+(b.p.y-a.p.y)*direction.y+(b.p.z-a.p.z)*direction.z);
     const positive=body.geometry.attributes.aOpenPositive;
     const negative=body.geometry.attributes.aOpenNegative;
+    const tier=body.geometry.attributes.aOpticalTier;
+    const near=ordered.filter(r=>!this.game.occupied(r.ix,r.iy,r.k+1)||
+      !this.game.occupied(r.ix-1,r.iy,r.k)||!this.game.occupied(r.ix+1,r.iy,r.k)||
+      !this.game.occupied(r.ix,r.iy-1,r.k)||!this.game.occupied(r.ix,r.iy+1,r.k));
+    near.sort((a,b)=>Math.hypot(a.p.x-camera.position.x,a.p.y-camera.position.y,a.p.z-camera.position.z)-
+      Math.hypot(b.p.x-camera.position.x,b.p.y-camera.position.y,b.p.z-camera.position.z));
+    const opticalIds=new Set(near.slice(0,REFRACTION.maxBricks).map(r=>r.id));
+    body.userData.opticalCount=opticalIds.size;
     ordered.forEach((r,i)=>{
+      tier.setX(i,opticalIds.has(r.id)?1:0);
       body.setMatrixAt(i,r.matrix);body.setColorAt(i,r.color);
       const {ix,iy,k}=r;
       positive.setXYZ(i,+!this.game.occupied(ix+1,iy,k),+!this.game.occupied(ix,iy+1,k),+!this.game.occupied(ix,iy,k+1));
       negative.setXYZ(i,+!this.game.occupied(ix-1,iy,k),+!this.game.occupied(ix,iy-1,k),+!this.game.occupied(ix,iy,k-1));
     });
-    positive.needsUpdate=true;negative.needsUpdate=true;
+    tier.needsUpdate=true;positive.needsUpdate=true;negative.needsUpdate=true;
     body.count=ordered.length;body.instanceMatrix.needsUpdate=true;body.instanceColor.needsUpdate=true;
     body.userData.lastSort=now;body.userData.version=this.fieldVersion;
   }

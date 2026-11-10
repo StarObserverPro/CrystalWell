@@ -158,17 +158,19 @@ export class CrystalWellGame {
     if (b.z - b.radius > RULES.shieldZ + 0.48) { this.loseBall(); return; }
 
     // Dragon = cheap moving height field, NOT a detailed mesh collider.
+    if (b.vz < 0 && b.z - b.radius < 2.3) {
     const brow = dragonBrow(b.x, b.y, this.time);
-    if (b.vz < 0 && b.z - b.radius <= brow.z) {
+    if (b.z - b.radius <= brow.z) {
       b.z = brow.z + b.radius + 0.002;
       if (brow.inside) {
         this.reflect(brow.nx, brow.ny, brow.nz);
         b.vx += Math.cos(this.time * .85) * .28;
         this.events.push({ type: 'dragon', x: b.x, y: b.y, z: b.z });
-      } else { b.vz = Math.abs(b.vz); this.events.push({ type: 'floor', x: b.x, y: b.y, z: b.z }); }
+      } else { this.reflect(brow.nx,brow.ny,brow.nz); this.events.push({ type: 'barrier', x: b.x, y: b.y, z: b.z }); }
       this.setSpeed();
       this.assistIfStalled();
       this.resonanceIfStalled();
+    }
     }
   }
 

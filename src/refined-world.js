@@ -6,11 +6,14 @@ import { crystalEnvironment,opticalCrystal,gemGeometry } from './gem-optics.js';
 import { emblem } from './icons-3d.js';
 import { crystal,put } from './model-kit.js';
 import { QUALITY } from './quality.js';
+import { MagicSea } from './magic-sea.js';
+import { ballDepthScale } from './visual-math.js';
 
 const COLORS={wide:0x71e6d6,slow:0x8aaeff,bind:0xca98ff,treasure:0xffd383};
 export class RefinedCrystalWorld extends LuminousCrystalWorld {
   constructor(scene,game){
     super(scene,game);
+    this.sea=new MagicSea(scene,scene.environment);
     this.bubbles=Array.from({length:QUALITY.maxBubbles},()=>this.createBubble());
     this.holdMaterial=new THREE.MeshBasicMaterial({color:0x87fff2,transparent:true,opacity:.84,
       depthTest:false,depthWrite:false,side:THREE.DoubleSide});
@@ -42,10 +45,10 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     });
     const ground=put(scene,new THREE.RingGeometry(9.8,90,128),new THREE.MeshStandardMaterial({color:0x02050a,roughness:.96,envMapIntensity:.10}),[0,0,-.5]);
     ground.name='Dark wilderness floor';this.wilderness=ground;
-    put(scene,new THREE.CircleGeometry(9.8,96),new THREE.MeshStandardMaterial({color:0x0c2b37,roughness:.25}),[0,0,-11.4]);
+    // No artificial bottom cap: the lower dragon continues past the viewport.
     // A quiet optical sleeve, not masonry competing with the 26 large rim crystals.
     this.wallMat=wallMaterial();this.wallMat.opacity=.30;
-    const wall=put(scene,new THREE.CylinderGeometry(9.82,9.82,21.5,96,1,true),this.wallMat,[0,0,-.35]);
+    const wall=put(scene,new THREE.CylinderGeometry(9.82,9.82,34,96,1,true),this.wallMat,[0,0,-6.45]);
     wall.rotation.x=Math.PI/2;wall.name='Transparent well sleeve';
     this.rim=new THREE.Group();this.rim.name='26 irregular optical crystals';scene.add(this.rim);
     const palette=[0xd8f6ff,0xc2e8ff,0xdbd6ff,0xcefff4];
@@ -91,6 +94,10 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     // Flight silhouettes stay at the physical location; held state gets ONE above-shield beacon.
     this.ball.visible=!hidden&&!held;this.ballHalo.visible=!hidden&&!held;this.ghost.visible=!hidden&&!held;this.sideGhost.visible=!hidden&&!held;
     this.heldCue.visible=held;this.launchGlyph.visible=held;this.predictor.visible=!held&&!hidden&&this.predictor.visible;
+    const scale=ballDepthScale(g.ball.z);
+    this.ball.scale.setScalar(scale);this.ballHalo.scale.set(1.7*scale,1.7*scale,1);
+    this.ghost.scale.setScalar(scale);this.sideGhost.scale.set(1.75*scale,1.75*scale,1);
+    this.sea.update(t,rise);
     this.heldCore.scale.setScalar(1+Math.sin(t*3)*.08);
     this.holdMaterial.color.set(g.readyReason==='capture'?0xd2a0ff:0x87fff2);
     this.heldCue.rotation.z=t*.4;
@@ -106,7 +113,11 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
   }
   prepareView(camera,side,now){
     super.prepareView(camera,side,now);
-    this.wilderness.visible=!side;this.wildernessRocks.visible=!side;
+    this.sea?.view(camera);
+    const optics=this.crystals.material.uniforms;
+    optics.uViewRotation.value.setFromMatrix4(camera.matrixWorldInverse);
+    optics.uRefraction.value=side||this.capturePass||!this.refractionEnabled?0:1;
+    this.wilderness.visible=!side&&!this.capturePass;this.wildernessRocks.visible=!side&&!this.capturePass;
     // These are 3D solid silhouettes, billboarded per actual rendering camera, not flat SVGs.
     const q=camera.quaternion;this.launchGlyph.quaternion.copy(q);
     for(const root of this.bubbles)for(const icon of Object.values(root.userData.icons))icon.quaternion.copy(q);

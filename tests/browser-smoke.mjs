@@ -17,7 +17,7 @@ const server=createServer(async(req,res)=>{
   catch{res.writeHead(404).end();}
 });
 await new Promise(resolve=>server.listen(4173,'127.0.0.1',resolve));
-const browser=await chromium.launch({args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
+const browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const errors=[],metrics={};
 const context=await browser.newContext({viewport:{width:1440,height:900},deviceScaleFactor:1});
 await context.route('https://cdn.jsdelivr.net/npm/three@0.187.0/**',async route=>{
@@ -33,10 +33,9 @@ async function shot(name) {
   await page.evaluate(()=>window.__crystalWell.suspendRendering());
   await page.evaluate(()=>window.__crystalWell.drawFrame());
   await page.screenshot({path:`artifacts/${name}.png`,timeout:120000});
-  await page.evaluate(()=>window.__crystalWell.resumeRendering());
 }
 try{
-  await page.goto('http://127.0.0.1:4173/?qa=1',{waitUntil:'networkidle'});
+  await page.goto('http://127.0.0.1:4173/?qa=1&staticQA=1',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>window.__crystalWell?.assetsReady,{timeout:60000});
   await page.evaluate(()=>{const q=window.__crystalWell;q.reset();q.game.time=.65;q.freeze();q.refresh();});
   await page.waitForTimeout(300);await shot('desktop');
@@ -55,12 +54,27 @@ try{
   assert.equal(await page.evaluate(()=>[...document.querySelectorAll('button')].every(b=>b.children.length===0&&getComputedStyle(b).borderWidth==='0px')),true);
   assert.equal(await page.evaluate(()=>{const q=window.__crystalWell,V=q.topCamera.position.constructor;
     for(let i=0;i<128;i++){const a=i*Math.PI*2/128,p=new V(Math.cos(a)*11.65,Math.sin(a)*11.65,11.7).project(q.topCamera);if(Math.abs(p.x)>.98||Math.abs(p.y)>.98)return false;}return true;}),true,'Expanded coping fits main view');
+  metrics.optics=await page.evaluate(()=>{const q=window.__crystalWell;
+    q.refraction.invalidate();q.drawFrame();const gl=q.renderer.getContext(),w=q.renderer.domElement.width,h=q.renderer.domElement.height;
+    const before=new Uint8Array(w*h*4),after=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,before);
+    q.refraction.enabled=false;q.drawFrame();gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,after);
+    let difference=0;for(let i=0;i<before.length;i+=4)if(Math.abs(before[i]-after[i])+Math.abs(before[i+1]-after[i+1])+Math.abs(before[i+2]-after[i+2])>9)difference++;
+    q.refraction.enabled=true;q.refraction.invalidate();
+    return {difference,width:q.refraction.target.width,height:q.refraction.target.height,count:q.world.crystals.userData.opticalCount,captures:q.refraction.captures};});
+  assert.ok(metrics.optics.count>0&&metrics.optics.count<=384);assert.ok(metrics.optics.width<=720&&metrics.optics.height<=720);
+  assert.ok(metrics.optics.difference>100,'Refraction must change rendered pixels, not just a toggle flag');
+  metrics.ballDepth=await page.evaluate(()=>{const q=window.__crystalWell,g=q.game;const radius=g.ball.radius;
+    g.state='playing';g.ball.z=-8;q.refresh();const far=q.world.ball.scale.x;
+    g.ball.z=10;q.refresh();const near=q.world.ball.scale.x;
+    return {far,near,radius,unchanged:g.ball.radius===radius,halo:q.world.ballHalo.scale.x,ghost:q.world.ghost.scale.x};});
+  assert.ok(metrics.ballDepth.near/metrics.ballDepth.far>1.45);assert.equal(metrics.ballDepth.unchanged,true);
+  await page.evaluate(()=>{const q=window.__crystalWell;q.reset();q.freeze();q.game.time=2.4;q.refresh();});
   // Screen-space aiming after substantial orbit.
   const xy=await page.evaluate(()=>{const q=window.__crystalWell;q.game.time=68;q.refresh();const V=q.topCamera.position.constructor,p=new V(2,-3,10.55).project(q.topCamera),r=document.querySelector('#main-panel').getBoundingClientRect();return {x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};});
   await page.mouse.move(xy.x,xy.y);const aim=await page.evaluate(()=>window.__crystalWell.game.shield);
   assert.ok(Math.abs(aim.targetX-2)<.025&&Math.abs(aim.targetY+3)<.025);
   // Pausing cannot launch or move the shield. Repeated Esc keydown must not toggle twice.
-  await page.evaluate(()=>window.__crystalWell.unfreeze());
+  await page.evaluate(()=>{window.__crystalWell.unfreeze();window.__crystalWell.resumeRendering();});
   await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__crystalWell.paused),true);
   const frozen=await page.evaluate(()=>({time:window.__crystalWell.game.time,score:window.__crystalWell.game.score}));
   await page.keyboard.press('Space');await page.waitForTimeout(180);
@@ -68,6 +82,7 @@ try{
   assert.equal(await page.evaluate(()=>window.__crystalWell.game.time),frozen.time);
   await shot('paused');
   await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__crystalWell.paused),false);
+  await page.evaluate(()=>window.__crystalWell.suspendRendering());
   await page.evaluate(()=>window.__crystalWell.freeze());
   // HUD interaction must not be mistaken for shield input or a launch.
   await page.locator('#sound').click();assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'ready');
@@ -99,6 +114,8 @@ try{
   }
   await page.evaluate(()=>{const q=window.__crystalWell;q.game.time=240.65;q.game.heldSince=240.2;q.refresh();});
   await shot('dragon-front');
+  metrics.head=await page.evaluate(()=>{const q=window.__crystalWell;q.game.time=241;q.refresh();const a=[...q.world.dragon.userData.motion.value.elements];q.game.time=242.7;q.refresh();return {a,b:[...q.world.dragon.userData.motion.value.elements],sea:q.world.sea.mesh.visible};});
+  assert.notDeepEqual(metrics.head.a,metrics.head.b);assert.equal(metrics.head.sea,true);
   await page.keyboard.press('Space');assert.equal(await page.evaluate(()=>window.__crystalWell.game.state),'playing');
   // A capture arriving during an existing drag must not launch when that drag ends.
   await page.mouse.move(400,450);await page.mouse.down();
@@ -123,7 +140,10 @@ try{
   await page.setViewportSize({width:844,height:390});
   await page.evaluate(()=>{const q=window.__crystalWell;q.reset();q.game.time=.7;q.freeze();q.refresh();});
   await page.waitForTimeout(350);await shot('landscape');
+  assert.equal(await page.evaluate(()=>{const q=__crystalWell,V=q.sideCamera.position.constructor;
+    for(let i=0;i<128;i++){const a=i*Math.PI*2/128,p=new V(Math.cos(a)*11.9,Math.sin(a)*11.9,12.05).project(q.sideCamera);if(Math.abs(p.x)>.98||Math.abs(p.y)>.98)return false;}return true;}),true,'Full near-side rim stays inside the mobile secondary view');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  assert.equal(await page.evaluate(()=>{const q=window.__crystalWell;return Math.abs(q.sideTarget.width/q.sideTarget.height-(innerWidth-document.querySelector('#main-panel').getBoundingClientRect().width)/innerHeight)<.01;}),true,'Mobile side scene uses full height beneath the HUD');
   assert.equal(await page.evaluate(()=>{const h=window.__crystalWell.hud;return h.scoreGroup.position.x<200 &&
     h.fpsGroup.scale.x>=1 && parseFloat(document.querySelector('#pause').style.width)>=44;}),true,'Mobile score clears the rim and touch targets stay large');
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);

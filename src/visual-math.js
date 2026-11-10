@@ -1,3 +1,4 @@
+import { BARRIER } from './barrier-math.js';
 /** Renderer-independent presentation rules, shared by camera/input and tests. */
 export const CAMERA_TILT = Math.PI / 9; // 20 degrees away from the vertical.
 export const ORBIT_SPEED = Math.PI * 2 / 240;
@@ -19,7 +20,7 @@ export const HEAT_STOPS = Object.freeze([
   [0, [0.23, 0.27, 1]], [.28, [.10, .73, 1]],
   [.54, [.37, 1, .82]], [.77, [1, .76, .16]], [1, [1, .20, .065]],
 ]);
-export function depthHeat(z, shieldZ = 10.55, floorZ = .6) {
+export function depthHeat(z, shieldZ = 10.55, floorZ = BARRIER.z) {
   const u = saturate((z - floorZ) / (shieldZ - floorZ));
   let i = 1;
   while (i < HEAT_STOPS.length - 1 && u > HEAT_STOPS[i][0]) i++;
@@ -40,4 +41,10 @@ export class FrameMeter {
     this.start = now; this.frames = 0; this.sideFrames = 0;
     return this.value;
   }
+}
+
+/** Deliberately exaggerated perspective cue in a stable orthographic playfield. Physics is unchanged. */
+export function ballDepthScale(z, shieldZ=10.55, floorZ=BARRIER.z) {
+  const depth=saturate((shieldZ-z)/(shieldZ-floorZ));
+  return 1.30/(1+.585*depth);
 }
