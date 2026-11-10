@@ -16,28 +16,19 @@ Move the mouse or drag a finger in the main view to move the shield. Click/touch
 
 Normal shield contact rebounds immediately. Only the purple bind pickup enables capture. New-life serves and captured balls both wait for explicit release: cyan crystal petals mean a new ball, purple petals mean a captured ball. A pulsing sculpted launch symbol marks the held state. Missing a ball briefly leaves the shield empty before a replacement appears. There are **three lives**.
 
-## Current version: v0.5 — face, sea and optical depth
+## Current version: v0.6 — matte dragon and lighter rendering
 
-The approved external sculpt is fitted from a central facial estimate rather than its horns or whiskers. A broad, colored face articulates about the neck; its collision proxy follows the same motion. A translucent, undulating horizontal magical sea crosses the head, while the lower body is no longer artificially clipped.
+The approved external sculpt now has a matte body, mane, horns and beard; only source-space eye regions retain gloss. A further **30° nose-down rotation about the actual across-ear axis** is applied to both the rendered face and its sampled collision proxy. The cameras frame the scene slightly closer without changing shield controls.
 
-The ball visibly grows towards the shield (about 0.82× to 1.30×; collision radius unchanged). Up to 384 near exposed bricks receive bounded screen-space refraction from a half-resolution, maximum-720-pixel background capture at up to 30 Hz. Side-view rendering stays low-rate. Mobile HUD overlays the full-height scene, without a dedicated empty header strip.
+The magical sea fills the visible ground plane instead of ending at a circular disk. Its visual radius is 256 units; collision remains confined to the original 9.72-unit well radius. The rim is **ten elongated, intergrown crystal segments** with irregular broad facets, replacing 26 separate pebbles.
 
-The three-life scoring/pickup rules, above-shield cyan/purple held-ball cue and 26-crystal rim are retained. Details and approximation limits: [v0.5 implementation notes](docs/V05-DRAGON-SEA-OPTICS.md).
+The low-value refraction system is removed completely: no background capture target, no refractive brick selection, no physical transmission prepass and no three-bounce prism loop. Single-pass reflections and cheap tinted thickness keep the crystal appearance. Fully enclosed bricks stay in physics but are not drawn until exposed. Pixel density, three lives, score, bubbles, depth-colored ball and all model HUD controls are preserved.
 
-## v0.4 foundation
-
-- **External dragon model**, not a generated head: Grab3D's Chinese Dragon, bundled locally with its CC0 license, source manifest and SHA-256 provenance. The publisher discloses an AI-assisted Meshy/Blender workflow. Original sculpt/albedo details are preserved and recolored to ice-blue; no procedural substitute is silently loaded.
-- **26 large irregular rim crystals**, replacing the old segmented masonry, decorations and corbels. Shared physical transmission, thickness, attenuation, dispersion and HDR reflections are supplemented by an approximate three-bounce internal-prism effect. This is not full scene ray tracing.
-- Held/captured ball uses **one above-shield beacon**, depth-independent in both views, with cyan for new serves and purple for captures. The physical ball is hidden only while held; normal flight and collisions remain unchanged.
-- Accurate continuous solid icon silhouettes replace the old disconnected pieces. The restart arrow is one joined polygon; bubble symbols face each actual camera. All visible HUD remains 3D geometry, with no SVG HUD or drawn fine outlines.
-- Subject-fitted main/side layout: main view uses about 66% of a 1440×900 screen and 58% of an 844×390 landscape screen, rather than giving a wide empty rectangle to a circular subject. The well is enlarged, secondary colors are subdued, and the side camera includes the deeper sculpt.
-- v0.3 scoring, three lives, four pickup bubbles, explicit serve/capture controls, quality profile, 1,926-brick solid well and rotating orthogonal views are retained.
-
-Current specification: [v0.4 visual revision](docs/V04-VISUAL-REBUILD.md). Earlier rules: [design contract](docs/DESIGN.md).
+See [v0.6 implementation/verification notes](docs/V06-MATTE-SEA-PERFORMANCE.md). Earlier visual revisions are historical, not current requirements.
 
 ## Implementation
 
-`physics.js` is the deterministic collision kernel. Production uses `AdventureGame` in `gameplay.js` for lives, scoring, pickups and explicit serve/capture states. `refined-world.js` extends the existing instanced crystal renderer; `hud-3d.js` renders the model HUD with the same WebGL context. The external dragon is a single 399,999-triangle sculpt; the rim shares four optical materials, and bubbles/particles are pooled. Crystal optics are a stylized approximation, not per-crystal ray tracing.
+`physics.js` is the deterministic collision kernel. Production uses `AdventureGame` in `gameplay.js` for lives, scoring, pickups and explicit serve/capture states. `refined-world.js` extends the existing instanced crystal renderer; `hud-3d.js` renders the model HUD with the same WebGL context. The external dragon remains the same 399,999-triangle sculpt; the ten rim segments share four lightweight materials, and bubbles/particles are pooled. Crystal optics are a stylized approximation, not per-crystal ray tracing.
 
 ```bash
 npm run check

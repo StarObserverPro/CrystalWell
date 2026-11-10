@@ -29,14 +29,11 @@ export function makeCrystalMaterial(lamps) {
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: THREE.FrontSide,
     uniforms: {
-      uRefraction:{value:0},uBackground:{value:null},uBackgroundSize:{value:new THREE.Vector2(1,1)},
-      uViewRotation:{value:new THREE.Matrix3()},
       uTime: { value: 0 }, uEye: { value: new THREE.Vector3(0, -12, 38) },
       uBall: { value: new THREE.Vector3() },
       uLamps: { value: lamps.map(l => l.position) },
     },
     vertexShader: `
-      attribute float aOpticalTier;varying float vOpticalTier;varying vec4 vClip;
       attribute vec3 aOpenPositive; attribute vec3 aOpenNegative;
       varying float vSurface;
       varying vec3 vWorld; varying vec3 vNormal; varying vec3 vLocal; varying vec3 vTint;
@@ -47,15 +44,14 @@ export function makeCrystalMaterial(lamps) {
         vSurface = clamp(dot(max(normal,vec3(0.)),aOpenPositive)
                        + dot(max(-normal,vec3(0.)),aOpenNegative),0.,1.);
         vNormal = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
-        vOpticalTier=aOpticalTier;vClip=projectionMatrix*viewMatrix*world;gl_Position=vClip;
+        gl_Position=projectionMatrix*viewMatrix*world;
       }`,
     fragmentShader: `
-      varying float vOpticalTier;varying vec4 vClip;
-      uniform float uRefraction;uniform sampler2D uBackground;uniform vec2 uBackgroundSize;uniform mat3 uViewRotation;
       varying float vSurface;
       uniform float uTime; uniform vec3 uEye; uniform vec3 uBall; uniform vec3 uLamps[4];
       varying vec3 vWorld; varying vec3 vNormal; varying vec3 vLocal; varying vec3 vTint;
       void main() {
+        if(vSurface<.02)discard; // buried interfaces need neither lighting nor blending
         vec3 N = normalize(vNormal), V = normalize(uEye - vWorld);
         vec3 q = abs(vLocal) / vec3(.49, .50, .45);
         float edge = smoothstep(.78, .99, max(min(q.x,q.y), max(min(q.y,q.z),min(q.x,q.z))));
@@ -87,17 +83,6 @@ export function makeCrystalMaterial(lamps) {
         float thickness=clamp(min(exitDistance.x,min(exitDistance.y,exitDistance.z)),.12,1.5);
         vec3 transmittance=exp(-(vec3(1.)-clamp(vTint,vec3(.08),vec3(.92)))*thickness*.42);
         color*=mix(vec3(1.),transmittance,.28);
-        if(uRefraction>.5 && vOpticalTier>.5 && vSurface>.45){
-          vec2 uv=vClip.xy/vClip.w*.5+.5;
-          vec3 viewN=uViewRotation*N;
-          vec2 offset=viewN.xy*(1.-1./1.46)*thickness*.022;
-          vec2 maxOffset=vec2(5.)/uBackgroundSize;offset=clamp(offset,-maxOffset,maxOffset);
-          vec2 uvR=clamp(uv+offset*.96,vec2(.002),vec2(.998));
-          vec2 uvG=clamp(uv+offset,vec2(.002),vec2(.998));
-          vec2 uvB=clamp(uv+offset*1.04,vec2(.002),vec2(.998));
-          vec3 background=vec3(texture2D(uBackground,uvR).r,texture2D(uBackground,uvG).g,texture2D(uBackground,uvB).b);
-          color=mix(color,background*transmittance+color*.20,(1.-fresnel)*.44);
-        }
         // A slight bevel shadow separates bricks without drawing a wireframe over the scene.
         color *= mix(1.,.70,smoothstep(.72,.87,max(q.x,q.y))*(1.-edge));
         // Near faces retain stronger definition; distant layers stay translucent.

@@ -18,78 +18,48 @@ export function crystalEnvironment() {
   const texture=new THREE.DataTexture(data,w,h,THREE.RGBAFormat,THREE.FloatType);
   texture.mapping=THREE.EquirectangularReflectionMapping;texture.needsUpdate=true;return texture;
 }
+/** Single-pass crystal: broad reflected facets and tinted interior, no scene capture or ray loops. */
 export function opticalCrystal(color,thickness=1.6,environment=null) {
-  const material = new THREE.MeshPhysicalMaterial({color,metalness:0,roughness:.055,transmission:.93,opacity:1,
-    thickness,ior:1.58,dispersion:.34,clearcoat:1,clearcoatRoughness:.035,
-    attenuationColor:new THREE.Color(color),attenuationDistance:3.8,envMapIntensity:1.7,
-    flatShading:true,side:THREE.FrontSide});
-  if(environment){
-    material.onBeforeCompile=shader=>{
-      shader.uniforms.cwOpticalEnvironment={value:environment};
-      shader.vertexShader='varying mat3 cwModel; varying vec3 cwLocal; varying vec3 cwEye;\n'+shader.vertexShader;
-      shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`
-        #include <begin_vertex>
-        cwLocal=position;cwModel=mat3(modelMatrix);
-        cwEye=(inverse(modelMatrix)*vec4(cameraPosition,1.)).xyz;
-      `);
-      shader.fragmentShader=`
-        uniform sampler2D cwOpticalEnvironment; varying mat3 cwModel;
-        varying vec3 cwLocal; varying vec3 cwEye;
-        vec3 cwSky(vec3 dir){
-          dir=normalize(cwModel*dir);
-          vec2 uv=vec2(atan(dir.z,dir.x)*.15915494+.5,asin(clamp(dir.y,-1.,1.))*.31830989+.5);
-          return texture2D(cwOpticalEnvironment,uv).rgb;
-        }
-        // Three internal bounces in an approximate seven-sided cut volume.
-        // The outer material still supplies actual screen-space transmission.
-        vec3 cwPrism(vec3 p,vec3 d){
-          vec3 light=vec3(0.);float weight=.55;
-          p*=.90;
-          for(int bounce=0;bounce<3;bounce++){
-            float nearT=100.;vec3 hitN=vec3(0.,0.,1.);
-            for(int j=0;j<16;j++){
-              vec3 n;float h;
-              if(j<14){
-                float a=float(j/2)*.8975979;
-                n=normalize(vec3(cos(a),sin(a),j-2*(j/2)==0?.72:-.60));h=.82;
-              }else{n=vec3(0.,0.,j==14?1.:-1.);h=.62;}
-              float den=dot(n,d),t=(h-dot(n,p))/max(den,.0001);
-              if(den>.0001&&t>.002&&t<nearT){nearT=t;hitN=n;}
-            }
-            vec3 escape=refract(d,-hitN,1.58);
-            if(dot(escape,escape)>.01){light+=cwSky(escape)*weight;weight*=.30;}
-            else weight*=.82;
-            p+=d*min(nearT,2.);d=reflect(d,hitN);p+=d*.006;
-          }
-          return light+cwSky(d)*weight;
-        }
-      `+shader.fragmentShader;
-      shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>',`
-        vec3 cwN=normalize(cross(dFdx(cwLocal),dFdy(cwLocal)));
-        vec3 cwIncoming=normalize(cwLocal-cwEye);
-        if(dot(cwN,cwIncoming)>0.)cwN=-cwN;
-        vec3 cwInternal=cwPrism(cwLocal,refract(cwIncoming,cwN,1./1.58));
-        outgoingLight+=cwInternal*diffuse*.72;
-        #include <opaque_fragment>
-      `);
-    };
-    material.customProgramCacheKey=()=> 'optical-crystal-prism-bounces-v04';
-  }
-  return material;
+  const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.FrontSide,
+    uniforms:{uTint:{value:new THREE.Color(color)},uEnvironment:{value:environment},uThickness:{value:thickness}},
+    vertexShader:`varying vec3 vWorld,vNormal;
+      void main(){vec4 p=modelMatrix*vec4(position,1.);vWorld=p.xyz;vNormal=normalize(mat3(modelMatrix)*normal);
+        gl_Position=projectionMatrix*viewMatrix*p;}`,
+    fragmentShader:`uniform vec3 uTint;uniform sampler2D uEnvironment;uniform float uThickness;
+      varying vec3 vWorld,vNormal;
+      vec3 sky(vec3 d){d=normalize(d);return texture2D(uEnvironment,vec2(atan(d.z,d.x)*.15915494+.5,asin(clamp(d.y,-1.,1.))*.31830989+.5)).rgb;}
+      void main(){vec3 N=normalize(vNormal),V=normalize(cameraPosition-vWorld);float facing=abs(dot(N,V));
+        float fresnel=.10+.70*pow(1.-facing,4.);
+        vec3 R=reflect(-V,N),reflected=sky(R),interior=sky(normalize(R+N*.24));
+        float path=uThickness/max(.40,facing);vec3 absorb=exp(-(1.-uTint)*path*.40);
+        float key=.45+.55*max(0.,dot(N,normalize(vec3(-.45,-.35,1.))));
+        vec3 color=uTint*key*.34+reflected*(.16+.70*fresnel)+interior*uTint*absorb*.14;
+        color+=uTint*pow(max(dot(reflect(normalize(vec3(.45,.35,-1.)),N),V),0.),48.)*.85;
+        gl_FragColor=vec4(color,mix(.84,.98,fresnel));
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`});
+  material.userData.optics='single-pass reflected facets; no transmission capture';return material;
 }
-/** Closed 32-facet asymmetric crystal. Each block has broad readable faces. */
-export function gemGeometry(seed=1) {
-  let n=seed>>>0;const rand=()=>{n^=n<<13;n^=n>>>17;n^=n<<5;return(n>>>0)/4294967296;};
-  const sides=7,vertices=[],faces=[];const angles=[];
-  for(let j=0;j<sides;j++)angles.push(j*Math.PI*2/sides+(rand()-.5)*.16);
-  for(let k=0;k<3;k++)for(let j=0;j<sides;j++){
-    const a=angles[j],r=(k===1?1:k===0?.70:.55)*( .91+rand()*.16);
-    vertices.push(Math.cos(a)*r,Math.sin(a)*r,(k===0?-.52:k===1?-.05:.56)+(rand()-.5)*.12);
+
+/** Ten joined elongated prisms with broad irregular cuts. Shared end profiles avoid pebble gaps. */
+export function rimSegmentGeometry(index,count=10) {
+  const positions=[],indices=[],sides=6,stations=4,step=Math.PI*2/count;
+  const profile=(a,t)=>{
+    const swell=Math.sin(Math.PI*t),outer=11.35+.13*Math.sin(a*3+.4)+swell*.16*Math.sin(index*2.4),inner=9.86+.045*Math.sin(a*5)-swell*.07;
+    const low=10.30+.10*Math.sin(a*4),top=11.38+.20*Math.sin(a*3+.7)+swell*(.12+.18*Math.sin(index*1.7));
+    return [[inner,low+.08],[inner,top-.32],[inner+.25,top],
+      [outer-.24,top+.05*Math.sin(a*7)],[outer,top-.35],[outer,low]];
+  };
+  for(let k=0;k<stations;k++){
+    const t=k/(stations-1),a=step*(index+t)-.006+t*.012;
+    for(const [r,z] of profile(a,t))positions.push(Math.cos(a)*r,Math.sin(a)*r,z);
   }
-  for(let k=0;k<2;k++)for(let j=0;j<sides;j++){
-    const a=k*sides+j,b=k*sides+(j+1)%sides,c=b+sides,d=a+sides;faces.push(a,b,c,a,c,d);
+  for(let k=0;k<stations-1;k++)for(let j=0;j<sides;j++){
+    const a=k*sides+j,b=k*sides+(j+1)%sides,c=b+sides,d=a+sides;
+    indices.push(a,b,c,a,c,d);
   }
-  for(let j=1;j<sides-1;j++){faces.push(0,j+1,j);faces.push(14,14+j,14+j+1);}
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));g.setIndex(faces);
-  const flat=g.toNonIndexed();g.dispose();flat.computeVertexNormals();return flat;
+  for(let j=1;j<sides-1;j++){indices.push(0,j+1,j);const o=(stations-1)*sides;indices.push(o,o+j,o+j+1);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);
+  const flat=g.toNonIndexed();g.dispose();flat.computeVertexNormals();flat.computeBoundingBox();return flat;
 }

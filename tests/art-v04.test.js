@@ -22,7 +22,7 @@ test('composition follows subject aspect and reduces empty primary margins',()=>
   for(const [w,h] of [[1440,900],[844,390],[2560,1080]]){
     const c=composition(w,h);assert.equal(c.mainWidth+c.sideWidth,w);
     assert.ok(c.mainWidth<=w*.74);assert.ok(c.sideWidth>=w*.25);
-    assert.ok(c.halfHeight*c.mainWidth/h>=12.4-.01);
+    assert.ok(c.halfHeight*c.mainWidth/h>=11.95-.01);
   }
 });
 test('external model is bundled, hash-verified and licensed, not the generated head',()=>{

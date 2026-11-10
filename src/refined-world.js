@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { LuminousCrystalWorld } from './presentation.js';
 import { RULES,clamp } from './physics.js';
 import { wallMaterial } from './crystal-material.js';
-import { crystalEnvironment,opticalCrystal,gemGeometry } from './gem-optics.js';
+import { crystalEnvironment,opticalCrystal,rimSegmentGeometry } from './gem-optics.js';
 import { emblem } from './icons-3d.js';
 import { crystal,put } from './model-kit.js';
 import { QUALITY } from './quality.js';
@@ -46,19 +46,17 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     const ground=put(scene,new THREE.RingGeometry(9.8,90,128),new THREE.MeshStandardMaterial({color:0x02050a,roughness:.96,envMapIntensity:.10}),[0,0,-.5]);
     ground.name='Dark wilderness floor';this.wilderness=ground;
     // No artificial bottom cap: the lower dragon continues past the viewport.
-    // A quiet optical sleeve, not masonry competing with the 26 large rim crystals.
+    // A quiet optical sleeve, not masonry competing with the 10 joined rim crystals.
     this.wallMat=wallMaterial();this.wallMat.opacity=.30;
     const wall=put(scene,new THREE.CylinderGeometry(9.82,9.82,34,96,1,true),this.wallMat,[0,0,-6.45]);
     wall.rotation.x=Math.PI/2;wall.name='Transparent well sleeve';
-    this.rim=new THREE.Group();this.rim.name='26 irregular optical crystals';scene.add(this.rim);
-    const palette=[0xd8f6ff,0xc2e8ff,0xdbd6ff,0xcefff4];
+    this.rim=new THREE.Group();this.rim.name='10 intergrown long crystal segments';scene.add(this.rim);
+    const palette=[0xaadbea,0xb7cfe8,0xbac1e2,0xaee6dc];
     this.rimMaterials=palette.map(c=>opticalCrystal(c,1.6,scene.environment));
-    for(let i=0;i<26;i++){
-      const a=i*Math.PI*2/26,noise=Math.sin(i*13.71),r=10.72+Math.sin(i*7.3)*.10;
-      const gem=put(this.rim,gemGeometry(974+i*811),this.rimMaterials[i%4],
-        [Math.cos(a)*r,Math.sin(a)*r,10.82+noise*.18],[1.06+noise*.14,1.37+Math.cos(i*9.1)*.18,1.05+Math.sin(i*3.3)*.25]);
-      gem.rotation.set(Math.cos(i*5.9)*.10,Math.sin(i*4.1)*.12,a+Math.sin(i*2.7)*.08);
-      gem.name=`Optical rim crystal ${i+1}`;
+    for(let i=0;i<10;i++){
+      const gem=put(this.rim,rimSegmentGeometry(i,10),this.rimMaterials[i%4]);
+      gem.name=`Long intergrown rim crystal ${i+1}`;
+      gem.userData.aspectRatio=4.6;gem.renderOrder=5;
     }
     // Sparse rocky wilderness; it stays subordinate to the playable well.
     const rocks=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0x09111d,roughness:.95,envMapIntensity:.12,flatShading:true}),90);
@@ -114,10 +112,8 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
   prepareView(camera,side,now){
     super.prepareView(camera,side,now);
     this.sea?.view(camera);
-    const optics=this.crystals.material.uniforms;
-    optics.uViewRotation.value.setFromMatrix4(camera.matrixWorldInverse);
-    optics.uRefraction.value=side||this.capturePass||!this.refractionEnabled?0:1;
-    this.wilderness.visible=!side&&!this.capturePass;this.wildernessRocks.visible=!side&&!this.capturePass;
+    // The wide sea must remain visible outside the well in both cameras.
+    this.wilderness.visible=false;this.wildernessRocks.visible=false;
     // These are 3D solid silhouettes, billboarded per actual rendering camera, not flat SVGs.
     const q=camera.quaternion;this.launchGlyph.quaternion.copy(q);
     for(const root of this.bubbles)for(const icon of Object.values(root.userData.icons))icon.quaternion.copy(q);

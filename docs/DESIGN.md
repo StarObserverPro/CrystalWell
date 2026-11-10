@@ -1,6 +1,6 @@
-# Crystal Well — gameplay contract (v0.5)
+# Crystal Well — gameplay contract (v0.6)
 
-The [v0.5 revision](V05-DRAGON-SEA-OPTICS.md) supersedes older visual/layout details. The approved external dragon is fitted from its face core and has weighted neck articulation, color zoning and a synchronized collision proxy. A horizontal magical sea intersects the head; the lower body is not artificially cut off. Ball display size expresses depth without changing its collision radius. The closest 384 exposed crystal bricks can use limited screen-space refraction; mobile HUD overlays a full-height scene. Scoring, three lives, powerups and the 26-crystal rim remain unchanged.
+The [v0.6 revision](V06-MATTE-SEA-PERFORMANCE.md) supersedes older art and optical settings. The approved external dragon has matte skin/horns/mane and glossy eyes, with a further 30° nose-down ear-axis rotation shared by display and collisions. The wide visual sea has a central-only collision disk. The rim has ten joined elongated crystals. Screen-space and physical-transmission refraction are removed; visible reflections and tinted thickness are single-pass. Internal enclosed bricks are drawn only when exposed, without removing them from gameplay.
 
 ## Player-facing experience
 
@@ -12,7 +12,7 @@ Desktop and phone landscape only. The primary orthographic camera is tilted 20°
 
 The well radius is 9.72. A 20×20 grid clipped to radius 9.1 holds eight vertical crystal layers: 1,926 occupied cells, including many radial layers. The front (-Y) has a connected, multi-height notch. This is a filled cylinder, not a thin barrel.
 
-The circular shield is at Z=10.55, base radius 1.32, and moves in XY. Upward balls that contact it rebound downward. Missing the opening costs one of three lives. Well-wall and floor bounces are safe. The external dragon is scaled to a 17.04-unit silhouette across the opening. A coarse moving height field sampled from the imported mesh handles collisions; the triangle mesh is never a per-frame collider.
+The circular shield is at Z=10.55, base radius 1.32, and moves in XY. Upward balls that contact it rebound downward. Missing the opening costs one of three lives. Well-wall and floor bounces are safe. The fitted facial core is approximately 15.55 units across the 19.44-unit opening, excluding decorative appendages. A coarse moving height field sampled from the imported mesh handles collisions; the triangle mesh is never a per-frame collider.
 
 Local fracture, periodic resonance and a small final collapse remove crystals. Victory requires zero crystals, followed by the full dragon's rise. The restart model waits until the reveal animation has been shown.
 
@@ -32,6 +32,6 @@ Pickups are rising iridescent magic bubbles with solid symbols inside. They must
 
 The v0.3 quality profile gives main and side targets approximately twice the v0.2 pixel allocation, doubles the particle pool to 1,040 and doubles reflection-map pixels. Side refresh remains deliberately low. This is a budget, not a guaranteed frame-time ratio. No silent automatic quality reduction.
 
-Crystals use instanced geometry, exposed-face shading, separate sorted main/side instance buffers and hybrid optical effects. Coping and dragon detail are merged by material. Magic bubbles and motes have fixed pools. HUD uses an orthographic model scene in the same renderer. FPS is measured from actual frame timestamps, not fixed physics time.
+Crystals use instanced geometry, exposed-face shading, separate sorted main/side instance buffers and hybrid optical effects. The imported dragon remains one mesh; the rim shares four lightweight materials. Magic bubbles and motes have fixed pools. HUD uses an orthographic model scene in the same renderer. FPS is measured from actual frame timestamps, not fixed physics time.
 
 Detailed numeric choices and verification notes: [v0.3 revision](V03-GAMEPLAY-AND-ART.md). The older [visual revision](VISUAL-REVISION.md) records v0.2 history; current rules take precedence.

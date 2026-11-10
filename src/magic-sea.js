@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { BARRIER } from './barrier-math.js';
 
-/** One bounded horizontal surface. Analytic normals and physics use the same three waves. */
+/** One wide visual sea; only the original well aperture participates in physics. */
 export class MagicSea {
   constructor(scene,environment) {
-    const rings=40,sectors=112,positions=[0,0,0],indices=[];
+    const rings=64,sectors=112,positions=[0,0,0],indices=[];
     for(let r=1;r<=rings;r++)for(let s=0;s<sectors;s++){
-      const a=s*Math.PI*2/sectors,d=BARRIER.radius*r/rings;positions.push(Math.cos(a)*d,Math.sin(a)*d,0);
+      const a=s*Math.PI*2/sectors,d=BARRIER.visualRadius*(r/rings)**2;positions.push(Math.cos(a)*d,Math.sin(a)*d,0);
     }
     for(let s=0;s<sectors;s++)indices.push(0,1+s,1+(s+1)%sectors);
     for(let r=1;r<rings;r++)for(let s=0;s<sectors;s++){
@@ -39,13 +39,16 @@ export class MagicSea {
             if(age>=0.&&age<2.4){float d=length(vWorld.xy-uImpacts[i].xy);ripple+=exp(-pow((d-age*3.2)*2.7,2.))*exp(-age*1.25)*uImpacts[i].w;}
           }
           color+=vec3(.22,.68,.72)*ripple;
-          float rim=1.-smoothstep(12.4,12.8,length(vWorld.xy));
+          float rim=1.; // no visible circular edge; the sea spans the view
+          float horizon=1.-exp(-length(vWorld.xy)*.008);
+          color=mix(color,vec3(.022,.052,.078),horizon*.72);
           float alpha=(.43+.13*f+.08*wave+.12*ripple)*rim*(1.-smoothstep(.1,.85,uRise));
           gl_FragColor=vec4(color,alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`});
     this.mesh=new THREE.Mesh(geometry,this.material);this.mesh.name='Undulating horizontal magical sea';this.mesh.renderOrder=2;this.mesh.frustumCulled=false;
+    this.mesh.userData.visualRadius=BARRIER.visualRadius;this.mesh.userData.collisionRadius=BARRIER.radius;
     scene.add(this.mesh);
   }
   impact(x,y,time,strength=1){this.impacts[this.cursor++%this.impacts.length].set(x,y,time,strength);}
