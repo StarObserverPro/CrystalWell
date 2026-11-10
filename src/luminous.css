@@ -1,0 +1,15 @@
+/* Luminous revision: models carry the ornament; the HUD stays peripheral. */
+.game-panel::before { opacity: .25; }
+.game-panel::after, .side-panel::after { display: none; }
+.side-panel::before { opacity: .32; }
+.icon-btn { background: linear-gradient(135deg,rgba(126,190,219,.18),rgba(35,66,96,.48)); box-shadow: inset 0 1px 0 rgba(211,242,255,.18); }
+.start-gem { border: 0; background: none; box-shadow: none; }
+.drop-orb { display: block; width: 12px; height: 12px; margin: auto; border-radius:50%; background:#ffe9b1; box-shadow:0 0 14px 5px #ffc65f66; animation: crystal-drop 2s ease-in-out infinite; }
+@keyframes crystal-drop { 0%,100% { transform: translateY(-8px); opacity:.4; } 65% { transform: translateY(10px); opacity:1; } }
+.progress-gem { width:14px; height:23px; display:block; background:linear-gradient(115deg,#e5fbff 0 28%,#78d7ea 29% 58%,#668bc9 59%); clip-path:polygon(50% 0,100% 30%,80% 79%,50% 100%,20% 79%,0 30%); }
+.fps-readout { position:absolute; z-index:3; right:18px; bottom:18px; display:flex; flex-direction:column; align-items:flex-end; gap:3px; padding:7px 9px; border-radius:7px; background:rgba(9,20,34,.66); color:#bceee8; font:12px/1.2 ui-monospace,monospace; font-variant-numeric:tabular-nums; pointer-events:auto; }
+.fps-readout b { font-weight:600; }
+.fps-readout small { font-size:10px; color:#aebfd0; }
+.fps-readout[data-load=busy] b { color:#ffdb8c; }
+.fps-readout[data-load=heavy] b { color:#ff998f; }
+@media (max-height:500px) { .fps-readout { right:12px; bottom:10px; padding:5px 7px; font-size:11px; } }
