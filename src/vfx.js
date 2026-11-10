@@ -1,15 +1,15 @@
 import * as THREE from 'three';
 
 // Bounded, pooled magic motes. No per-particle Mesh or draw call.
-const CAPACITY = 330;
+const CAPACITY = 520;
 export function createGlowTexture() {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
   const ctx = canvas.getContext('2d');
   const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
   grd.addColorStop(0, 'rgba(255,255,255,1)');
-  grd.addColorStop(.13, 'rgba(195,244,255,.9)');
-  grd.addColorStop(.39, 'rgba(91,179,250,.29)');
-  grd.addColorStop(1, 'rgba(39,79,155,0)');
+  grd.addColorStop(.13, 'rgba(255,255,255,.9)');
+  grd.addColorStop(.39, 'rgba(255,255,255,.29)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = grd; ctx.fillRect(0, 0, 64, 64);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -45,6 +45,8 @@ export class MagicMotes {
         void main(){ float d=length(gl_PointCoord-vec2(.5));
           float a=(1.0-smoothstep(.11,.5,d))*vAlpha;
           gl_FragColor=vec4(vColor,a);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
         }`,
     });
     this.object = new THREE.Points(geometry, material);
@@ -52,8 +54,14 @@ export class MagicMotes {
     scene.add(this.object);
   }
 
+  clear() {
+    for (const particle of this.particles) particle.life = 0;
+    this.alpha.fill(0); this.pointer = 0;
+    this.object.geometry.attributes.aAlpha.needsUpdate = true;
+  }
+
   emit(x, y, z, count = 1, burst = false, hue = 'ice') {
-    const color = hue === 'pink' ? [1, .42, .8] : hue === 'gold' ? [1, .82, .48] : [.36, .86, 1];
+    const color = Array.isArray(hue) ? new THREE.Color().setRGB(...hue, THREE.SRGBColorSpace).toArray() : hue === 'pink' ? [1, .42, .8] : hue === 'gold' ? [1, .82, .48] : [.36, .86, 1];
     for (let n = 0; n < count; n++) {
       const i = this.pointer++ % CAPACITY;
       const j = i * 3;
@@ -70,6 +78,7 @@ export class MagicMotes {
       p.life = p.max;
       this.alpha[i] = .7; this.sizes[i] = burst ? 2.1 + Math.random() * 2.5 : 1.35 + Math.random() * 1.6;
       this.colors.set(color, j);
+      this.attributesDirty = true;
     }
   }
 
@@ -84,6 +93,11 @@ export class MagicMotes {
       this.positions[j + 2] += p.vz * dt;
       p.vz -= dt * .33;
       this.alpha[i] = (p.life / p.max) ** 1.3 * .8;
+    }
+    if (this.attributesDirty) {
+      this.object.geometry.attributes.aColor.needsUpdate = true;
+      this.object.geometry.attributes.aSize.needsUpdate = true;
+      this.attributesDirty = false;
     }
     this.object.geometry.attributes.position.needsUpdate = true;
     this.object.geometry.attributes.aAlpha.needsUpdate = true;

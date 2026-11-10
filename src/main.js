@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CrystalWellGame, RULES, clamp } from './physics.js';
-import { CrystalWorld } from './world.js';
+import { LuminousCrystalWorld as CrystalWorld } from './presentation.js';
+import { viewBasis, depthHeat, FrameMeter } from './visual-math.js';
 import { MagicMotes } from './vfx.js';
 
 const app = document.getElementById('app');
@@ -16,6 +17,8 @@ const startHint = document.getElementById('start-hint');
 const endOverlay = document.getElementById('end-overlay');
 const viewRefresh = document.getElementById('view-refresh');
 const errorPanel = document.getElementById('error-panel');
+const fpsDisplay = document.getElementById('fps-readout');
+const frameMeter = new FrameMeter();
 
 let renderer;
 try {
@@ -30,7 +33,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, matchMedia('(point
 renderer.setSize(Math.max(1, app.clientWidth), Math.max(1, app.clientHeight), false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.22;
+renderer.toneMappingExposure = 1.28;
+renderer.info.autoReset = false;
 renderer.autoClear = false;
 renderer.domElement.className = 'stage';
 renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -46,6 +50,7 @@ topCamera.up.set(0, 1, 0);
 topCamera.lookAt(0, 0, 0);
 topCamera.layers.enable(1); // ball silhouette and landing projection: top camera only
 const sideCamera = new THREE.PerspectiveCamera(42, 1, .1, 180);
+sideCamera.up.set(0, 0, 1);
 sideCamera.layers.enable(2); // true-position x-ray glint on side, never the top-projected marker
 
 const sideTarget = new THREE.WebGLRenderTarget(320, 480, {
@@ -72,6 +77,13 @@ let lastMoteTime = 0;
 let lastWinBurst = 0;
 let width = 1, height = 1, mainWidth = 1, sideWidth = 1;
 let sideFps = 18;
+let sideDistance = 40;
+const cameraTarget = new THREE.Vector3(0, 0, 5.3);
+const raycaster = new THREE.Raycaster();
+const shieldPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -RULES.shieldZ);
+const pointer = new THREE.Vector2();
+const hitPoint = new THREE.Vector3();
+let lastPointer = null;
 const keys = new Set();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let soundEnabled = true;
@@ -154,22 +166,36 @@ function resize() {
   sideCamera.updateProjectionMatrix();
   const fovRads = THREE.MathUtils.degToRad(sideCamera.fov);
   const distance = Math.max(31, 21.5 / (2 * Math.tan(fovRads / 2) * sideAspect));
-  const dir = new THREE.Vector3(.28, -.88, .38).normalize();
-  sideCamera.position.copy(dir.multiplyScalar(distance)).add(new THREE.Vector3(0, 0, 4.8));
-  sideCamera.lookAt(0, 0, 4.8);
+  sideDistance = distance;
+  updateCameras();
+  frameMeter.reset();
   sideFps = matchMedia('(pointer: coarse)').matches ? 14 : 18;
   lastSideFrame = -1e5;
 }
 
-function aimFromPointer(event) {
-  if (!playingLandscape) return;
+function updateCameras() {
+  const basis = viewBasis(game.time, reducedMotion);
+  topCamera.position.fromArray(basis.main).multiplyScalar(36).add(cameraTarget);
+  topCamera.up.fromArray(basis.up);
+  topCamera.lookAt(cameraTarget); topCamera.updateMatrixWorld(true);
+  sideCamera.position.fromArray(basis.side).multiplyScalar(sideDistance).add(cameraTarget);
+  sideCamera.lookAt(cameraTarget); sideCamera.updateMatrixWorld(true);
+}
+function reprojectPointer() {
+  if (!lastPointer || !playingLandscape) return;
   const r = mainPanel.getBoundingClientRect();
   if (r.width < 1 || r.height < 1) return;
-  const u = clamp((event.clientX - r.left) / r.width, 0, 1);
-  const v = clamp((event.clientY - r.top) / r.height, 0, 1);
-  game.aim(topCamera.left + u * (topCamera.right - topCamera.left),
-    topCamera.top - v * (topCamera.top - topCamera.bottom));
+  pointer.set(clamp((lastPointer.x-r.left)/r.width,0,1)*2-1,
+    1-clamp((lastPointer.y-r.top)/r.height,0,1)*2);
+  raycaster.setFromCamera(pointer, topCamera);
+  if (raycaster.ray.intersectPlane(shieldPlane, hitPoint)) game.aim(hitPoint.x, hitPoint.y);
 }
+function aimFromPointer(event) {
+  lastPointer = { x: event.clientX, y: event.clientY };
+  reprojectPointer();
+}
+mainPanel.addEventListener('pointerleave', () => { lastPointer = null; });
+mainPanel.addEventListener('pointercancel', () => { lastPointer = null; });
 mainPanel.addEventListener('pointermove', e => { aimFromPointer(e); });
 mainPanel.addEventListener('pointerdown', e => {
   if (e.target.closest('button')) return;
@@ -178,30 +204,30 @@ mainPanel.addEventListener('pointerdown', e => {
   aimFromPointer(e);
   game.launch();
 });
-mainPanel.addEventListener('pointerup', e => { if (mainPanel.hasPointerCapture?.(e.pointerId)) mainPanel.releasePointerCapture(e.pointerId); });
+mainPanel.addEventListener('pointerup', e => {
+  if (mainPanel.hasPointerCapture?.(e.pointerId)) mainPanel.releasePointerCapture(e.pointerId);
+  if (e.pointerType !== 'mouse') lastPointer = null;
+});
 window.addEventListener('keydown', event => {
   if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(event.key)) event.preventDefault();
   keys.add(event.key.toLowerCase());
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','s','d','w'].includes(event.key)) lastPointer = null;
   if (event.key.toLowerCase() === 'r') reset();
   if (event.key === ' ' && game.state === 'ready') { initAudio(); game.launch(); }
   if (event.key.toLowerCase() === 'p' || event.key === 'Escape') togglePause();
 });
 window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
-window.addEventListener('blur', () => { paused = true; pauseButton.classList.add('is-paused'); });
+window.addEventListener('blur', () => { paused = true; keys.clear(); lastPointer = null; frameMeter.reset(); pauseButton.classList.add('is-paused'); });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { paused = true; pauseButton.classList.add('is-paused'); }
-  previousTime = performance.now();
+  previousTime = performance.now(); frameMeter.reset();
 });
 
 function reset() {
   game.restart();
-  // Rebuild only the instanced field, restoring all 3D crystals and accents.
-  scene.remove(world.crystals, world.accents);
-  world.crystals.geometry.dispose(); world.crystals.material.dispose();
-  world.accents.geometry.dispose(); world.accents.material.dispose();
-  world.crystalMap = new Int32Array(game.grid.length).fill(-1);
-  world.gemMap = new Int32Array(game.grid.length).fill(-1);
-  world.makeCrystalField();
+  world.resetField(); vfx.clear();
+  accumulator = 0; lastPointer = null; lastSideFrame = -1e5;
+  frameMeter.reset(); updateCameras();
   paused = false; pauseButton.classList.remove('is-paused');
   endOverlay.classList.remove('visible');
   updateHud();
@@ -262,12 +288,15 @@ function renderSide(now) {
   renderer.setViewport(0, 0, sideTarget.width, sideTarget.height);
   renderer.setClearColor(0x07111b, 1);
   renderer.clear(true, true, true);
+  world.prepareView(sideCamera, true, now);
   renderer.render(scene, sideCamera);
   renderer.setRenderTarget(null);
   viewRefresh.classList.toggle('bright');
+  return true;
 }
 
 function render(now) {
+  renderer.info.reset();
   renderer.setRenderTarget(null);
   renderer.setScissorTest(true);
   renderer.setViewport(0, 0, width, height);
@@ -276,27 +305,40 @@ function render(now) {
   renderer.clear(true, true, true);
   renderer.setViewport(0, 0, mainWidth, height);
   renderer.setScissor(0, 0, mainWidth, height);
+  world.prepareView(topCamera, false, now);
   renderer.render(scene, topCamera);
 
-  renderSide(now);
+  const sideRendered = renderSide(now) === true;
   renderer.setScissorTest(true);
   renderer.setViewport(mainWidth, 0, sideWidth, height);
   renderer.setScissor(mainWidth, 0, sideWidth, height);
   renderer.clearDepth();
   renderer.render(screenScene, screenCamera);
   renderer.setScissorTest(false);
+  const sample = frameMeter.record(now, sideRendered);
+  if (sample) {
+    fpsDisplay.innerHTML = `<b>${Math.round(sample.fps)} FPS</b><small>侧 ${Math.round(sample.sideFps)} · ${sample.ms.toFixed(1)} ms</small>`;
+    fpsDisplay.dataset.load = sample.fps < 30 ? 'heavy' : sample.fps < 45 ? 'busy' : 'normal';
+    fpsDisplay.title = `${renderer.info.render.calls} draws · ${Math.round(renderer.info.render.triangles/1000)}k triangles`;
+  }
 }
 
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(.045, Math.max(0, (now - previousTime) / 1000));
   previousTime = now;
-  if (!playingLandscape) return;
+  if (!playingLandscape) { frameMeter.reset(); return; }
+  updateCameras();
   if (!paused) {
+    reprojectPointer();
     if (keys.size) {
       const mx = (keys.has('arrowright') || keys.has('d') ? 1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1 : 0);
       const my = (keys.has('arrowup') || keys.has('w') ? 1 : 0) - (keys.has('arrowdown') || keys.has('s') ? 1 : 0);
-      if (mx || my) game.aim(game.shield.targetX + mx * dt * 13, game.shield.targetY + my * dt * 13);
+      if (mx || my) {
+        const basis = viewBasis(game.time, reducedMotion);
+        game.aim(game.shield.targetX + (mx*basis.right[0]+my*basis.screenUp[0])*dt*13,
+          game.shield.targetY + (mx*basis.right[1]+my*basis.screenUp[1])*dt*13);
+      }
     }
     accumulator += dt;
     let steps = 0;
@@ -307,7 +349,7 @@ function frame(now) {
     if (steps >= 7) accumulator = 0;
     for (const event of game.drainEvents()) handleEvent(event);
     if (game.state === 'playing' && now - lastMoteTime >= (reducedMotion ? 48 : 18)) {
-      vfx.emit(game.ball.x, game.ball.y, game.ball.z, 2, false, 'gold');
+      vfx.emit(game.ball.x, game.ball.y, game.ball.z, 3, false, depthHeat(game.ball.z));
       lastMoteTime = now;
     }
     const rise = game.state === 'won' ? clamp((game.time - game.wonAt) / 6, 0, 1) : 0;
@@ -325,3 +367,9 @@ function frame(now) {
   render(now);
 }
 requestAnimationFrame(frame);
+
+if (new URLSearchParams(location.search).has('qa')) {
+  window.__crystalWell = { game, world, renderer, topCamera, sideCamera, frameMeter, reset,
+    pause: () => { paused = true; }, resume: () => { paused = false; },
+    refresh: () => { updateCameras(); world.update(0, game.time); lastSideFrame = -1e5; } };
+}
