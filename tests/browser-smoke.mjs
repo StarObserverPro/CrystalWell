@@ -5,7 +5,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createServer } from 'node:http';
 const root=process.cwd();
-await fs.mkdir('artifacts',{recursive:true});
+await fs.mkdir('artifacts/renderer-deps',{recursive:true});
+// Include the exact tested renderer for offline reproduction of screenshots.
+for(const file of ['three.module.js','three.core.js']) {
+  await fs.copyFile(path.join(root,'node_modules/three/build',file),path.join('artifacts/renderer-deps',file));
+}
+await fs.copyFile(path.join(root,'node_modules/three/LICENSE'),'artifacts/renderer-deps/LICENSE');
 const mime={'.js':'text/javascript','.mjs':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml'};
 const server=createServer(async(req,res)=>{
   const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
@@ -41,6 +46,15 @@ try {
   assert.ok(metrics.desktop.crystals>1800);
   assert.equal(metrics.desktop.sideCrystals,metrics.desktop.crystals);
   assert.match(metrics.desktop.fps,/\d+ FPS/);
+  assert.equal(await page.evaluate(()=>{
+    const q=window.__crystalWell, V=q.topCamera.position.constructor;
+    for(let i=0;i<64;i++) {
+      const a=i*Math.PI*2/64;
+      const p=new V(Math.cos(a)*10.83,Math.sin(a)*10.83,11.05).project(q.topCamera);
+      if(Math.abs(p.x)>.98||Math.abs(p.y)>.98)return false;
+    }
+    return true;
+  }),true,'The complete well rim should remain inside the main view');
   // Check screen-space control after the camera has rotated substantially.
   const xy=await page.evaluate(()=>{
     const q=window.__crystalWell;q.game.time=68;q.refresh();

@@ -32,14 +32,20 @@ export function makeCrystalMaterial(lamps) {
       uLamps: { value: lamps.map(l => l.position) },
     },
     vertexShader: `
+      attribute vec3 aOpenPositive; attribute vec3 aOpenNegative;
+      varying float vSurface;
       varying vec3 vWorld; varying vec3 vNormal; varying vec3 vLocal; varying vec3 vTint;
       void main() {
         vec4 world = modelMatrix * instanceMatrix * vec4(position, 1.0);
         vWorld = world.xyz; vLocal = position; vTint = instanceColor;
+        // Highlight actual exposed faces, not every buried face in an eight-layer stack.
+        vSurface = clamp(dot(max(normal,vec3(0.)),aOpenPositive)
+                       + dot(max(-normal,vec3(0.)),aOpenNegative),0.,1.);
         vNormal = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
         gl_Position = projectionMatrix * viewMatrix * world;
       }`,
     fragmentShader: `
+      varying float vSurface;
       uniform float uTime; uniform vec3 uEye; uniform vec3 uBall; uniform vec3 uLamps[4];
       varying vec3 vWorld; varying vec3 vNormal; varying vec3 vLocal; varying vec3 vTint;
       void main() {
@@ -49,7 +55,7 @@ export function makeCrystalMaterial(lamps) {
         float fresnel = pow(1.0 - abs(dot(N,V)), 3.0);
         vec3 refracted = refract(-V, N, .68);
         float band = pow(.5+.5*sin(dot(refracted,vec3(7.,11.,5.))), 12.);
-        vec3 light = vec3(.34, .40, .53);
+        vec3 light = vec3(.31, .36, .44);
         float sparkle = 0.;
         for (int i=0; i<4; i++) {
           vec3 d = uLamps[i] - vWorld;
@@ -60,14 +66,16 @@ export function makeCrystalMaterial(lamps) {
           float wave = sin(dot(vWorld,vec3(2.1,1.4,1.7)) + uTime*.75 + float(i)*1.7)
                      * sin(dot(vWorld,vec3(-1.2,2.4,.8)) - uTime*.53);
           float caustic = pow(1.0-abs(wave), 13.);
-          light += tint * attenuation * (diffuse*.72 + caustic*.65);
+          light += tint * attenuation * (diffuse*.55 + caustic*.52);
           sparkle += pow(max(dot(reflect(-L,N),V),0.),64.) * attenuation;
         }
         vec3 color = vTint * light;
         color += vec3(.35,.68,.86) * (fresnel*.42 + band*.20);
-        color += vec3(.60,.87,1.) * edge*.34 + vec3(sparkle*.65);
+        color += mix(vTint,vec3(.70,.90,1.),.5) * edge*.25 + vec3(sparkle*.65);
+        // A slight bevel shadow separates bricks without drawing a wireframe over the scene.
+        color *= mix(1.,.70,smoothstep(.72,.87,max(q.x,q.y))*(1.-edge));
         // Near faces retain stronger definition; distant layers stay translucent.
-        float alpha = .22 + edge*.24 + fresnel*.10;
+        float alpha = mix(.025 + edge*.025, .57 + edge*.20 + fresnel*.08, vSurface);
         float clearBall = 1.0-smoothstep(.6,1.65,length(vWorld-uBall));
         alpha *= 1.0 - clearBall*.65;
         gl_FragColor = vec4(color, alpha);

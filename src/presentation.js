@@ -42,8 +42,9 @@ export class LuminousCrystalWorld extends CrystalWorld {
     scene.background = new THREE.Color(0x101c2b);
     scene.fog = new THREE.FogExp2(0x101c2b,.006);
     scene.environment = makeReflectionEnvironment();
-    scene.add(new THREE.HemisphereLight(0xc3e3ff,0x445369,2.05));
-    const key = new THREE.DirectionalLight(0xe3f7ff,2.15);
+    const ambient = new THREE.HemisphereLight(0xc3e3ff,0x445369,1.35);
+    ambient.position.set(0,0,1); scene.add(ambient);
+    const key = new THREE.DirectionalLight(0xe3f7ff,1.85);
     key.position.set(-7,-10,24); scene.add(key);
     const fill = new THREE.DirectionalLight(0xb49de9,.85);
     fill.position.set(10,4,13); scene.add(fill);
@@ -54,11 +55,11 @@ export class LuminousCrystalWorld extends CrystalWorld {
     });
 
     const ground = mesh(new THREE.PlaneGeometry(160,160),
-      new THREE.MeshStandardMaterial({color:0x172435,roughness:.96}),scene,0,0,-.5);
+      new THREE.MeshStandardMaterial({color:0x090f1b,roughness:.96}),scene,0,0,-.5);
     ground.name = 'Dark wilderness floor';
     const random = rng(7320), cursor = new THREE.Object3D();
     const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),
-      new THREE.MeshStandardMaterial({color:0x465569,roughness:.84,flatShading:true}),220);
+      new THREE.MeshStandardMaterial({color:0x283747,roughness:.84,flatShading:true}),220);
     for (let i=0;i<rocks.count;i++) {
       const a=random()*Math.PI*2, r=11.4+Math.pow(random(),.6)*37, s=.16+random()*1.3;
       cursor.position.set(Math.cos(a)*r,Math.sin(a)*r,-.23);
@@ -129,7 +130,7 @@ export class LuminousCrystalWorld extends CrystalWorld {
   makeCrystalField() {
     this.records=[]; this.fieldVersion=0;
     const random=rng(8401), cursor=new THREE.Object3D();
-    const palette=[0x56c5e4,0x96b3f0,0x70dbce,0xafa4e1,0x89d4ed];
+    const palette=[0x389ecf,0x688ddf,0x43c4b4,0x977acb,0x83c8df];
     for(let id=0;id<this.game.grid.length;id++) {
       if(!this.game.grid[id]) continue;
       const k=Math.floor(id/(RULES.cells*RULES.cells)), rem=id%(RULES.cells*RULES.cells);
@@ -137,15 +138,18 @@ export class LuminousCrystalWorld extends CrystalWorld {
       cursor.position.set(p.x,p.y,p.z);cursor.updateMatrix();
       const color=new THREE.Color(palette[(Math.floor(random()*4)+k)%palette.length]);
       color.multiplyScalar(.86+random()*.25);
-      this.records.push({id,p,matrix:cursor.matrix.clone(),color,alive:true});
+      this.records.push({id,p,k,ix:rem%RULES.cells,iy:Math.floor(rem/RULES.cells),matrix:cursor.matrix.clone(),color,alive:true});
     }
     this.byId=new Map(this.records.map(r=>[r.id,r]));
     const geometry=crystalBrick(), material=makeCrystalMaterial(this.movingLights);
     this.crystals=new THREE.InstancedMesh(geometry,material,this.records.length);
-    this.sideCrystals=new THREE.InstancedMesh(geometry,material,this.records.length);
+    this.sideCrystals=new THREE.InstancedMesh(geometry.clone(),material,this.records.length);
     for(const [i,body] of [this.crystals,this.sideCrystals].entries()) {
       body.layers.set(i+1); body.name=i?'Side-view sorted crystal volume':'Main-view sorted crystal volume';
       body.instanceMatrix.setUsage(THREE.DynamicDrawUsage);body.renderOrder=3;
+      for (const name of ['aOpenPositive','aOpenNegative']) {
+        body.geometry.setAttribute(name,new THREE.InstancedBufferAttribute(new Float32Array(this.records.length*3),3).setUsage(THREE.DynamicDrawUsage));
+      }
       body.frustumCulled=false;body.userData.lastSort=-Infinity;body.userData.version=-1;
       // Allocate instanceColor before shader compilation.
       this.records.forEach((r,j)=>{body.setMatrixAt(j,r.matrix);body.setColorAt(j,r.color);});
@@ -154,7 +158,7 @@ export class LuminousCrystalWorld extends CrystalWorld {
   }
   resetField() {
     this.scene.remove(this.crystals,this.sideCrystals);
-    this.crystals.geometry.dispose();this.crystals.material.dispose();
+    this.crystals.geometry.dispose();this.sideCrystals.geometry.dispose();this.crystals.material.dispose();
     this.crystals.dispose();this.sideCrystals.dispose();
     this.makeCrystalField();
   }
@@ -172,7 +176,15 @@ export class LuminousCrystalWorld extends CrystalWorld {
     const direction=new THREE.Vector3();camera.getWorldDirection(direction);
     const ordered=this.records.filter(r=>r.alive);
     ordered.sort((a,b)=>(b.p.x-a.p.x)*direction.x+(b.p.y-a.p.y)*direction.y+(b.p.z-a.p.z)*direction.z);
-    ordered.forEach((r,i)=>{body.setMatrixAt(i,r.matrix);body.setColorAt(i,r.color);});
+    const positive=body.geometry.attributes.aOpenPositive;
+    const negative=body.geometry.attributes.aOpenNegative;
+    ordered.forEach((r,i)=>{
+      body.setMatrixAt(i,r.matrix);body.setColorAt(i,r.color);
+      const {ix,iy,k}=r;
+      positive.setXYZ(i,+!this.game.occupied(ix+1,iy,k),+!this.game.occupied(ix,iy+1,k),+!this.game.occupied(ix,iy,k+1));
+      negative.setXYZ(i,+!this.game.occupied(ix-1,iy,k),+!this.game.occupied(ix,iy-1,k),+!this.game.occupied(ix,iy,k-1));
+    });
+    positive.needsUpdate=true;negative.needsUpdate=true;
     body.count=ordered.length;body.instanceMatrix.needsUpdate=true;body.instanceColor.needsUpdate=true;
     body.userData.lastSort=now;body.userData.version=this.fieldVersion;
   }

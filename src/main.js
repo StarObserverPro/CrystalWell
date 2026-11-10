@@ -151,7 +151,7 @@ function resize() {
   renderer.setSize(width, height, false);
   playingLandscape = window.innerWidth > window.innerHeight;
   const aspect = mainWidth / height;
-  const halfHeight = Math.max(11.6, 11.8 / aspect);
+  const halfHeight = Math.max(13.1, 12.0 / aspect);
   topCamera.left = -halfHeight * aspect;
   topCamera.right = halfHeight * aspect;
   topCamera.top = halfHeight;

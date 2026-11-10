@@ -10,7 +10,9 @@ level dimensions, the 1,926-brick filled volume, and the player-side excavation 
   drive a shared crystal shader with analytic refracted-environment bands, Fresnel highlights,
   moving caustics and facet edges. These are deliberately hybrid, stylized optics, not a claim
   of physically correct multiple refraction through thousands of solids.
-- Every brick is an extruded, bevelled 3D solid. Its color and lit edge remain distinct. Two
+- Every brick is an extruded, bevelled 3D solid. Exposed faces retain stronger opacity and
+  bevel definition; buried faces stay faint, preventing stacked edges from merging into
+  bright stripes. Exposure updates when a neighboring brick is destroyed. Two
   independently sorted instanced buffers prevent one camera's transparent order from breaking
   the other. Sorting is throttled to 120 ms unless destruction makes a refresh necessary.
 - The well wall uses 520 bevelled annular masonry segments; the coping has 64 thick blocks,
