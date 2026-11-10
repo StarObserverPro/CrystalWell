@@ -1,6 +1,6 @@
-# Crystal Well — gameplay contract (v0.4)
+# Crystal Well — gameplay contract (v0.5)
 
-The [v0.4 visual revision](V04-VISUAL-REBUILD.md) supersedes older art and layout details below. Production uses an externally sourced CC0 dragon, 26 optical rim crystals, a sampled sculpt collision proxy, subject-fitted views and an above-shield held-ball beacon. The game rules are unchanged.
+The [v0.5 revision](V05-DRAGON-SEA-OPTICS.md) supersedes older visual/layout details. The approved external dragon is fitted from its face core and has weighted neck articulation, color zoning and a synchronized collision proxy. A horizontal magical sea intersects the head; the lower body is not artificially cut off. Ball display size expresses depth without changing its collision radius. The closest 384 exposed crystal bricks can use limited screen-space refraction; mobile HUD overlays a full-height scene. Scoring, three lives, powerups and the 26-crystal rim remain unchanged.
 
 ## Player-facing experience
 

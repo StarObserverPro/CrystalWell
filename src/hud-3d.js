@@ -97,16 +97,17 @@ export class SculptedHUD {
     this.width=width;this.height=height;this.mainWidth=mainWidth;
     this.camera.left=0;this.camera.right=width;this.camera.top=height;this.camera.bottom=0;this.camera.updateProjectionMatrix();
     this.scale=Math.min(1,Math.max(.8,height/650));const s=this.scale;
-    this.lives.position.set(32*s,height-37*s,0);this.lives.scale.setScalar(s);
-    this.scoreGroup.position.set((height<550?43:160)*s,height-(height<550?68:37)*s,0);this.scoreGroup.scale.setScalar(s);
+    const mobile=height<550;
+    this.lives.position.set(24*s,height-27*s,0);this.lives.scale.setScalar(s);
+    this.scoreGroup.position.set((mobile?142:160)*s,height-(mobile?27:37)*s,0);this.scoreGroup.scale.setScalar(s);
     let i=0;
     for(const id of ['pause','sound','restart']) {
-      const x=width-(166-i*63)*s,y=height-39*s,root=this.buttons[id];root.position.set(x,y,0);root.scale.setScalar(s);
+      const x=width-(166-i*63)*s,y=height-(mobile?30:39)*s,root=this.buttons[id];root.position.set(x,y,0);root.scale.setScalar(s);
       const e=this.elements[id];Object.assign(e.style,{left:`${x-28*s}px`,top:`${height-y-28*s}px`,width:`${56*s}px`,height:`${56*s}px`});i++;
     }
-    this.progress.position.set(46*s,46*s,0);this.progress.scale.setScalar(s);
-    this.effects.position.set(107*s,37*s,0);this.effects.scale.setScalar(s);
-    this.fpsGroup.position.set(width-135*s,44*s,0);this.fpsGroup.scale.setScalar(s*1.3);
+    this.progress.position.set(37*s,37*s,0);this.progress.scale.setScalar(s);
+    this.effects.position.set(91*s,30*s,0);this.effects.scale.setScalar(s);
+    this.fpsGroup.position.set(width-135*s,40*s,0);this.fpsGroup.scale.setScalar(s*1.3);
     this.scrim.position.set(width/2,height/2,30);this.scrim.scale.set(width,height,1);
     this.modalButton.position.set(mainWidth/2,height/2,40);this.modalButton.scale.setScalar(s);
     this.modalScore.position.set(mainWidth/2-62*s,height/2-95*s,40);this.modalScore.scale.setScalar(s);

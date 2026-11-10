@@ -16,7 +16,15 @@ Move the mouse or drag a finger in the main view to move the shield. Click/touch
 
 Normal shield contact rebounds immediately. Only the purple bind pickup enables capture. New-life serves and captured balls both wait for explicit release: cyan crystal petals mean a new ball, purple petals mean a captured ball. A pulsing sculpted launch symbol marks the held state. Missing a ball briefly leaves the shield empty before a replacement appears. There are **three lives**.
 
-## Current version: v0.4 visual rebuild
+## Current version: v0.5 — face, sea and optical depth
+
+The approved external sculpt is fitted from a central facial estimate rather than its horns or whiskers. A broad, colored face articulates about the neck; its collision proxy follows the same motion. A translucent, undulating horizontal magical sea crosses the head, while the lower body is no longer artificially clipped.
+
+The ball visibly grows towards the shield (about 0.82× to 1.30×; collision radius unchanged). Up to 384 near exposed bricks receive bounded screen-space refraction from a half-resolution, maximum-720-pixel background capture at up to 30 Hz. Side-view rendering stays low-rate. Mobile HUD overlays the full-height scene, without a dedicated empty header strip.
+
+The three-life scoring/pickup rules, above-shield cyan/purple held-ball cue and 26-crystal rim are retained. Details and approximation limits: [v0.5 implementation notes](docs/V05-DRAGON-SEA-OPTICS.md).
+
+## v0.4 foundation
 
 - **External dragon model**, not a generated head: Grab3D's Chinese Dragon, bundled locally with its CC0 license, source manifest and SHA-256 provenance. The publisher discloses an AI-assisted Meshy/Blender workflow. Original sculpt/albedo details are preserved and recolored to ice-blue; no procedural substitute is silently loaded.
 - **26 large irregular rim crystals**, replacing the old segmented masonry, decorations and corbels. Shared physical transmission, thickness, attenuation, dispersion and HDR reflections are supplemented by an approximate three-bounce internal-prism effect. This is not full scene ray tracing.

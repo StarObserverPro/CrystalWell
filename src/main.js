@@ -4,7 +4,8 @@ import { AdventureGame } from './gameplay.js';
 import { QUALITY, pixelRatio, sideTargetSize } from './quality.js';
 import { SculptedHUD } from './hud-3d.js';
 import { RefinedCrystalWorld as CrystalWorld } from './refined-world.js';
-import { composition } from './composition.js';
+import { composition,sideViewDistance } from './composition.js';
+import { LimitedRefraction } from './refraction.js';
 import { viewBasis, depthHeat, FrameMeter } from './visual-math.js';
 import { MagicMotes } from './vfx.js';
 
@@ -42,6 +43,7 @@ app.prepend(renderer.domElement);
 const game = new AdventureGame();
 const scene = new THREE.Scene();
 let world = new CrystalWorld(scene, game);
+const refraction=new LimitedRefraction(renderer);world.refractionEnabled=true;
 const vfx = new MagicMotes(scene);
 const hud = new SculptedHUD(renderer, game, elements);
 hud.scene.environment=scene.environment;
@@ -74,7 +76,7 @@ screenScene.add(quad);
 
 let paused = false;
 let simulationFrozen = false;
-let renderSuspended = false;
+let renderSuspended = new URLSearchParams(location.search).has('qa') && new URLSearchParams(location.search).has('staticQA');
 let playingLandscape = true;
 let previousTime = performance.now();
 let accumulator = 0;
@@ -142,19 +144,18 @@ function resize() {
   topCamera.top = halfHeight + layout.centerY;
   topCamera.bottom = -halfHeight + layout.centerY;
   topCamera.updateProjectionMatrix();
-  sideHeight = Math.max(1,height-(height<550?54:76));
+  sideHeight = height; // HUD overlays the scene; no reserved mobile header strip.
   const sideAspect = sideWidth / sideHeight;
   const [tw, th] = sideTargetSize(sideWidth, sideHeight);
   sideTarget.setSize(tw, th);
   sideCamera.aspect = tw / th;
   sideCamera.updateProjectionMatrix();
-  const fovRads = THREE.MathUtils.degToRad(sideCamera.fov);
-  const distance = Math.max(34, 24.0 / (2 * Math.tan(fovRads / 2) * sideAspect));
-  sideDistance = distance;
+  sideDistance = sideViewDistance(sideAspect,sideCamera.fov);
   updateCameras();
   frameMeter.reset();
   sideFps = matchMedia('(pointer: coarse)').matches ? QUALITY.sideTouchHz : QUALITY.sideDesktopHz;
   hud.resize(width, height, mainWidth);
+  refraction.resize(mainWidth,height,renderer.getPixelRatio());
   updateHud();
   lastSideFrame = -1e5;
 }
@@ -219,7 +220,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function reset() {
-  game.restart(); world.resetField(); vfx.clear();
+  game.restart(); world.resetField(); vfx.clear();world.sea.reset();refraction.invalidate();
   accumulator = 0; lastPointer = null; pointerGesture = null; lastSideFrame = -1e5; keys.clear();
   frameMeter.reset(); updateCameras(); paused = false; simulationFrozen = false;
   world.update(0, game.time); updateHud();
@@ -271,7 +272,8 @@ function handleEvent(event) {
     case 'capture': vfx.emit(event.x,event.y,event.z,32,true,'pink'); chime('dragon',14); break;
     case 'serve': vfx.emit(event.x,event.y,event.z,28,true,'ice'); break;
     case 'pickup': vfx.emit(event.x,event.y,event.z,48,true,event.kind==='bind'?'pink':'gold'); chime('crystal',18); break;
-    case 'dragon': vfx.emit(event.x, event.y, event.z, 23, true, 'pink'); chime('dragon'); break;
+    case 'barrier': world.sea.impact(event.x,event.y,game.time);vfx.emit(event.x,event.y,event.z,16,true,'ice');break;
+    case 'dragon': world.sea.impact(event.x,event.y,game.time,.55);vfx.emit(event.x, event.y, event.z, 23, true, 'pink'); chime('dragon'); break;
     case 'wall': vfx.emit(event.x, event.y, event.z, 5, false, 'ice'); break;
     case 'floor': vfx.emit(event.x, event.y, event.z, 5, false, 'pink'); break;
     case 'miss':
@@ -303,6 +305,7 @@ function render(now) {
   renderer.setViewport(0,0,width,height); renderer.setClearColor(0x091324,1); renderer.clear(true,true,true);
   let sideRendered = false;
   if (playingLandscape) {
+    refraction.capture(scene,world,topCamera,now);
     renderer.setScissorTest(true); renderer.setViewport(0,0,mainWidth,height);renderer.setScissor(0,0,mainWidth,height);
     world.prepareView(topCamera,false,now);renderer.render(scene,topCamera);
     sideRendered=renderSide(now)===true;
@@ -312,7 +315,7 @@ function render(now) {
   updateHud(now);hud.render();
   if (playingLandscape) {
     const sample=frameMeter.record(now,sideRendered);
-    if(sample) elements.fps.title=`${renderer.info.render.calls} draws · ${Math.round(renderer.info.render.triangles/1000)}k triangles · 2x quality budget`;
+    if(sample) elements.fps.title=`${renderer.info.render.calls} draws · ${Math.round(renderer.info.render.triangles/1000)}k triangles · optics ${refraction.target.width}×${refraction.target.height} · ${world.crystals.userData.opticalCount||0} refractive bricks`;
   } else frameMeter.reset();
 }
 
@@ -363,12 +366,12 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 if (new URLSearchParams(location.search).has('qa')) {
-  window.__crystalWell = { game, world, renderer, topCamera, sideCamera, frameMeter, hud, sideTarget, quality: QUALITY, reset,
+  window.__crystalWell = { game, world, renderer, topCamera, sideCamera, frameMeter, hud, sideTarget, quality: QUALITY, refraction, reset,
     get assetsReady(){return assetsReady;},
     get paused() { return paused; },
     suspendRendering: () => { renderSuspended = true; }, resumeRendering: () => { renderSuspended = false; },
     drawFrame: () => { render(performance.now()); renderer.getContext().finish(); },
     freeze: () => { simulationFrozen = true; }, unfreeze: () => { simulationFrozen = false; },
     pause: () => setPaused(true), resume: () => setPaused(false),
-    refresh: () => { updateCameras(); world.update(0, game.time); updateHud(); lastSideFrame = -1e5; } };
+    refresh: () => { updateCameras(); world.update(0, game.time); updateHud(); refraction.invalidate(); lastSideFrame = -1e5; } };
 }
