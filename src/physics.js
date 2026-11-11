@@ -3,7 +3,8 @@ import { dragonBrow } from './dragon-shape.js';
 /** Crystal Well: deterministic, renderer-independent 3D arcade simulation. */
 export const RULES = Object.freeze({
   cells: 20, levels: 8, cell: 1,
-  brickBottom: 1.92, brickStep: 0.96, brickHalf: 0.465,
+  // Move the whole crystal seal toward the dragon, leaving more recovery room at the shield.
+  brickBottom: 1.32, brickStep: 0.96, brickHalf: 0.465,
   wellRadius: 9.72, crystalRadius: 9.1,
   shieldZ: 10.55, shieldRadius: 1.32,
   ballRadius: 0.34, ballSpeed: 7.4,
@@ -42,8 +43,8 @@ export function makeLevel() {
           && y < -5.1 + 0.36 * Math.sin(k * 2 + x * 1.6);
         // A small vertical pit, connected to the front notch, welcomes the first shots.
         const lip = k >= 6 && Math.abs(x - 0.5) < 1.75 && y < -4.45 && y > -7.75;
-        // Keep space immediately above the dragon's brow.
-        const crown = k === 0 && Math.hypot(x, y) < 2.2;
+        // Preserve clearance above the dragon's brow after lowering the seal.
+        const crown = k === 0 && Math.hypot(x, y) < 2.3;
         if (notch || lip || crown) continue;
         grid[brickIndex(ix, iy, k)] = 1;
         total++;

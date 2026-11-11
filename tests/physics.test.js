@@ -19,6 +19,14 @@ test('front-facing wall has a connected indentation and the bottom allows a drag
   assert.equal(grid[brickIndex(6, 6, 0)], 1);
 });
 
+test('lowered seal leaves extra shield recovery space without removing the eight brick layers', () => {
+  const top = RULES.brickBottom + (RULES.levels - 1) * RULES.brickStep + RULES.brickHalf;
+  const bottom = RULES.brickBottom - RULES.brickHalf;
+  assert.ok(RULES.shieldZ - top >= 2.0, `too little room for player: ${RULES.shieldZ - top}`);
+  assert.ok(bottom < 0.9, `seal is too far from the dragon: ${bottom}`);
+  assert.equal(RULES.levels, 8);
+});
+
 test('break event removes genuine occupied voxels and reports progress', () => {
   const game = new CrystalWellGame();
   const before = game.remaining;
