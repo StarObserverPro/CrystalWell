@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { crystal, put, polygon } from './model-kit.js';
 import { emblem } from './icons-3d.js';
+import { ShieldPad } from './shield-pad.js';
 
 const SEGMENTS = { '0':[0,1,2,3,4,5], '1':[1,2], '2':[0,1,6,4,3], '3':[0,1,6,2,3],
   '4':[5,6,1,2], '5':[0,5,6,2,3], '6':[0,5,6,4,2,3], '7':[0,1,2], '8':[0,1,2,3,4,5,6],
@@ -43,6 +44,7 @@ export class SculptedHUD {
     this.dim=crystal(0x243444,{metalness:.14,emissiveIntensity:0});
     this.plate=crystal(0x214558,{metalness:.52,roughness:.28});
     this.content=new THREE.Group();this.scene.add(this.content);
+    this.shieldPad=new ShieldPad();this.content.add(this.shieldPad);
     this.lives=new THREE.Group();this.content.add(this.lives);this.lifeGems=[];
     for(let i=0;i<3;i++) {
       const life=put(this.lives,new THREE.IcosahedronGeometry(12,1),this.ice,[i*35,0,0]);
@@ -65,11 +67,19 @@ export class SculptedHUD {
       el.addEventListener('pointerenter',()=>{root.userData.hover=true;});el.addEventListener('pointerleave',()=>{root.userData.hover=false;});
       el.addEventListener('focus',()=>{root.userData.hover=true;});el.addEventListener('blur',()=>{root.userData.hover=false;});
     }
-    this.progress=new THREE.Group();this.content.add(this.progress);this.progressGems=[];
+    this.progress=new THREE.Group();this.content.add(this.progress);
     const seal=emblem('seal',this.ice);seal.scale.setScalar(19);this.progress.add(seal);
+    const progressGem=new THREE.OctahedronGeometry(5.4,0),stamp=new THREE.Object3D();
+    this.litGems=new THREE.InstancedMesh(progressGem,this.ice,20);
+    this.dimGems=new THREE.InstancedMesh(progressGem,this.dim,20);
+    this.litGems.frustumCulled=this.dimGems.frustumCulled=false;
+    this.progress.add(this.litGems,this.dimGems);
+    stamp.scale.set(.68,1.05,.6);
     for(let i=0;i<20;i++) {
-      const a=i*Math.PI*2/20;const m=put(this.progress,new THREE.OctahedronGeometry(5.4,0),this.dim,
-        [Math.cos(a)*30,Math.sin(a)*30,0],[.68,1.05,.6]);m.rotation.z=a;this.progressGems.push(m);
+      const a=i*Math.PI*2/20;
+      stamp.position.set(Math.cos(a)*30,Math.sin(a)*30,0);stamp.rotation.z=a;stamp.updateMatrix();
+      this.litGems.setMatrixAt(i,stamp.matrix);
+      this.dimGems.setMatrixAt(19-i,stamp.matrix);
     }
     this.effects=new THREE.Group();this.content.add(this.effects);this.effectIcons={};
     ['wide','slow','bind'].forEach((kind,i)=>{const icon=emblem(kind,this.violet);icon.scale.setScalar(22);icon.position.set(i*48,0,0);this.effects.add(icon);this.effectIcons[kind]=icon;});
@@ -130,16 +140,18 @@ export class SculptedHUD {
     this.scoreGroup.scale.setScalar(s*(1+Math.max(0,1-(g.time-g.lastScoreAt)/.3)*.025));
     this.combo.set(g.multiplier);this.combo.visible=g.multiplier>1;
     this.lifeGems.forEach((m,i)=>{m.material=i<g.lives?this.ice:this.dim;m.scale.setScalar(i<g.lives?1:.65);m.rotation.y=time*.30+i*.35;});
-    this.progressGems.forEach((m,i)=>{m.material=i/20<1-g.remaining/g.total?this.ice:this.dim;});
+    this.litGems.count=Math.ceil(20*(g.total-g.remaining)/g.total);
+    this.dimGems.count=20-this.litGems.count;
     for(const [kind,icon] of Object.entries(this.effectIcons)) {icon.visible=g.effects[kind]>0;icon.rotation.y=Math.sin(time*1.8)*.18;}
     for(const [id,root] of Object.entries(this.buttons)) root.scale.setScalar(s*(root.userData.hover?1.10:1));
     this.buttons.pause.userData.symbol.visible=!paused;this.buttons.pause.userData.alt.visible=paused;
     this.buttons.sound.userData.symbol.traverse(o=>{if(o.isMesh)o.material=sound?this.ice:this.dim;});
-    if(metrics) {
+    if(metrics && metrics!==this.lastMetrics) {
       this.fps.set(Math.round(metrics.fps));this.sideFps.set(Math.round(metrics.sideFps));this.ms.set(Math.round(metrics.ms));
       this.fpsMaterial.color.set(metrics.fps<30?0xffa48d:metrics.fps<45?0xffdb91:0x9cdfe7);
       this.elements.fps.textContent=`${Math.round(metrics.fps)} FPS · 侧 ${Math.round(metrics.sideFps)} · ${metrics.ms.toFixed(1)} ms`;
     }
+    this.lastMetrics=metrics;
     const status=`${g.score}分，剩余${g.lives}条命，${paused?'暂停':g.held?(g.readyReason==='capture'?'球被黏住，点击或空格释放':'补发球已就位，点击或空格发射'):g.state}`;
     if(status!==this.lastA11y){this.elements.status.textContent=status;this.lastA11y=status;}
   }

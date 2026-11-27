@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createServer } from 'node:http';
+import { checkTouchPad } from './touch-pad-browser.mjs';
 const root=process.cwd();
 await fs.mkdir('artifacts/renderer-deps',{recursive:true});
 for(const file of ['three.module.js','three.core.js']) await fs.copyFile(path.join(root,'node_modules/three/build',file),path.join('artifacts/renderer-deps',file));
@@ -16,15 +17,18 @@ const server=createServer(async(req,res)=>{
   try{res.setHeader('content-type',mime[path.extname(filename)]||'application/octet-stream');res.end(await fs.readFile(filename));}
   catch{res.writeHead(404).end();}
 });
-await new Promise(resolve=>server.listen(4173,'127.0.0.1',resolve));
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const gameUrl=`http://127.0.0.1:${server.address().port}/?qa=1&staticQA=1`;
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
 const errors=[],metrics={};
 const context=await browser.newContext({viewport:{width:1440,height:900},deviceScaleFactor:1});
-await context.route('https://cdn.jsdelivr.net/npm/three@0.187.0/**',async route=>{
+const serveThree=async route=>{
   const rel=new URL(route.request().url()).pathname.split('/three@0.187.0/')[1];
   if(!rel||rel.includes('..'))return route.abort();
   await route.fulfill({path:path.join(root,'node_modules/three',rel),contentType:'text/javascript'});
-});
+};
+const threeUrl='https://cdn.jsdelivr.net/npm/three@0.187.0/**';
+await context.route(threeUrl,serveThree);
 const page=await context.newPage();
 page.on('pageerror',e=>errors.push(String(e)));
 page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
@@ -35,7 +39,7 @@ async function shot(name) {
   await page.screenshot({path:`artifacts/${name}.png`,timeout:120000});
 }
 try{
-  await page.goto('http://127.0.0.1:4173/?qa=1&staticQA=1',{waitUntil:'networkidle'});
+  await page.goto(gameUrl,{waitUntil:'networkidle'});
   await page.waitForFunction(()=>window.__crystalWell?.assetsReady,{timeout:60000});
   await page.evaluate(()=>{const q=window.__crystalWell;q.reset();q.game.time=.65;q.freeze();q.refresh();});
   await page.waitForTimeout(300);await shot('desktop');
@@ -64,6 +68,31 @@ try{
   assert.ok(metrics.optimization.visible<metrics.optimization.logical,'Buried crystals do not consume drawing budget');
   assert.ok(metrics.optimization.seaRadius>200);assert.equal(metrics.optimization.collisionRadius,9.72);
   assert.equal(metrics.optimization.matte,true);
+  metrics.surfaceCache=await page.evaluate(()=>{
+    const q=window.__crystalWell,{world,game}=q;
+    const occupied=game.occupied;
+    let reads=0;
+    game.occupied=function(...coords){reads++;return occupied.apply(this,coords);};
+    const prepareBoth=now=>{
+      world.prepareView(q.topCamera,false,now);
+      world.prepareView(q.sideCamera,true,now);
+    };
+    try {
+      q.game.time=60;q.refresh();prepareBoth(performance.now()+500);
+      const orbitReads=reads;
+      const visible=new Set(world.exposedCrystals().map(brick=>brick.id));
+      const buried=world.records.find(brick=>!visible.has(brick.id));
+      const neighbor=game.index(buried.ix,buried.iy,buried.k+1);
+      game.grid[neighbor]=0;game.remaining--;world.removeCrystals([neighbor]);
+      prepareBoth(performance.now()+501);
+      return {orbitReads,afterBreakReads:reads-orbitReads,openTop:buried.openPositive.z,
+        exposedInBoth:[world.crystals,world.sideCrystals].every(mesh=>mesh.userData.order.includes(buried))};
+    }finally{game.occupied=occupied;q.reset();q.freeze();q.refresh();}
+  });
+  assert.equal(metrics.surfaceCache.orbitReads,0);
+  assert.ok(metrics.surfaceCache.afterBreakReads>0);
+  assert.equal(metrics.surfaceCache.openTop,1);
+  assert.equal(metrics.surfaceCache.exposedInBoth,true);
   metrics.ballDepth=await page.evaluate(()=>{const q=window.__crystalWell,g=q.game;const radius=g.ball.radius;
     g.state='playing';g.ball.z=-8;q.refresh();const far=q.world.ball.scale.x;
     g.ball.z=10;q.refresh();const near=q.world.ball.scale.x;
@@ -151,6 +180,8 @@ try{
   await shot('portrait');
   assert.equal(await page.evaluate(()=>window.__crystalWell.hud.portrait.visible),true);
   assert.equal(await page.evaluate(()=>window.__crystalWell.hud.content.visible),false);
+  await context.close();
+  metrics.touchPad=await checkTouchPad(browser,gameUrl,threeUrl,serveThree,errors);
   assert.deepEqual(errors,[],'Browser/shader errors');
 }catch(error){
   metrics.failure=String(error);

@@ -32,6 +32,13 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     this.bindGems=[];
     for(let i=0;i<3;i++){const m=put(this.shield,new THREE.OctahedronGeometry(.14,0),this.holdMaterial,[-.35+i*.35,.98,.58]);m.renderOrder=90;this.bindGems.push(m);}
     this.predictor.geometry.dispose();this.predictor.geometry=new THREE.OctahedronGeometry(.42,0);this.predictor.material.opacity=.4;
+    // Narrow dark rims keep the shield and the flight glint legible over pale facets.
+    const contrast=new THREE.MeshBasicMaterial({color:0x102738,transparent:true,opacity:.80,
+      depthTest:false,depthWrite:false,toneMapped:false});
+    const backing=put(this.shield,new THREE.RingGeometry(RULES.shieldRadius-.22,RULES.shieldRadius+.15,72),contrast);
+    backing.layers.set(1);backing.renderOrder=11;
+    this.flightRim=put(this.ghost,new THREE.RingGeometry(.24,.36,36),contrast);
+    this.flightRim.layers.set(1);this.flightRim.renderOrder=59;
   }
   makeAtmosphere(){
     const scene=this.scene;
@@ -74,7 +81,7 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     super.makeShield();
     // The center is no longer an opaque boss over the caught ball.
     for(const m of [...this.shield.children]){
-      if(m.isMesh&&m.geometry.type==='OctahedronGeometry'&&Math.hypot(m.position.x,m.position.y)<.01){m.removeFromParent();m.geometry.dispose();}
+      if(m.isMesh&&!m.isInstancedMesh&&m.geometry.type==='OctahedronGeometry'&&Math.hypot(m.position.x,m.position.y)<.01){m.removeFromParent();m.geometry.dispose();}
       if(m.isMesh&&m.geometry.type==='LatheGeometry')m.material.opacity=.23;
     }
   }
@@ -115,7 +122,11 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     // The wide sea must remain visible outside the well in both cameras.
     this.wilderness.visible=false;this.wildernessRocks.visible=false;
     // These are 3D solid silhouettes, billboarded per actual rendering camera, not flat SVGs.
-    const q=camera.quaternion;this.launchGlyph.quaternion.copy(q);
-    for(const root of this.bubbles)for(const icon of Object.values(root.userData.icons))icon.quaternion.copy(q);
+    const q=camera.quaternion;
+    if(!side && this.ghost.visible)this.flightRim.quaternion.copy(q);
+    if(this.launchGlyph.visible)this.launchGlyph.quaternion.copy(q);
+    for(const root of this.bubbles)if(root.visible) {
+      for(const icon of Object.values(root.userData.icons))if(icon.visible)icon.quaternion.copy(q);
+    }
   }
 }

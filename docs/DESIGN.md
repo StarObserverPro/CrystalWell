@@ -6,7 +6,7 @@ The [v0.6 revision](V06-MATTE-SEA-PERFORMANCE.md) supersedes older art and optic
 
 Almost no explanatory text. All visible buttons, numbers, life crystals, progress clusters, effect symbols and portrait prompt are three-dimensional models. Transparent DOM controls exist for accessibility and input only. No fine outlines, wireframes or SVG HUD.
 
-Desktop and phone landscape only. The primary orthographic camera is tilted 20° from vertical and rotates once in 240 seconds. The secondary perspective camera stays orthogonal and updates at 18 Hz desktop / 14 Hz touch. Main view controls the shield; side view supplements depth. Ball heat color encodes distance from the opening, not camera distance.
+Desktop and phone landscape only. The primary orthographic camera is tilted 20° from vertical and rotates once in 240 seconds. The secondary perspective camera stays orthogonal and updates at 18 Hz desktop / 14 Hz touch. A translucent disc over the lower right maps touch positions to the shield plane using the primary camera’s screen axes. The secondary camera provides the depth view. Mouse input uses the main view directly. Ball heat color encodes distance from the opening.
 
 ## Space and collisions
 

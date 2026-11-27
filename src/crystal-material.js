@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { QUALITY } from './quality.js';
+import { RULES } from './physics.js';
 
 /** A small, generated reflection environment. No network assets or SVG textures. */
 export function makeReflectionEnvironment() {
@@ -83,10 +84,12 @@ export function makeCrystalMaterial(lamps) {
         float thickness=clamp(min(exitDistance.x,min(exitDistance.y,exitDistance.z)),.12,1.5);
         vec3 transmittance=exp(-(vec3(1.)-clamp(vTint,vec3(.08),vec3(.92)))*thickness*.42);
         color*=mix(vec3(1.),transmittance,.28);
+        float depth=1.-smoothstep(${RULES.brickBottom.toFixed(2)},${(RULES.brickBottom+(RULES.levels-1)*RULES.brickStep).toFixed(2)},vWorld.z);
+        color*=mix(vec3(1.),vec3(.59,.74,.86),depth);
         // A slight bevel shadow separates bricks without drawing a wireframe over the scene.
         color *= mix(1.,.70,smoothstep(.72,.87,max(q.x,q.y))*(1.-edge));
         // Near faces retain stronger definition; distant layers stay translucent.
-        float alpha = mix(.025 + edge*.025, .54 + edge*.18 + fresnel*.08, vSurface);
+        float alpha = mix(.025 + edge*.025, .58 + edge*.16 + fresnel*.08 - depth*.09, vSurface);
         float clearBall = 1.0-smoothstep(.6,1.65,length(vWorld-uBall));
         alpha *= 1.0 - clearBall*.65;
         gl_FragColor = vec4(color, alpha);

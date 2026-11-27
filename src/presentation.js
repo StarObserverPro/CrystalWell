@@ -25,6 +25,23 @@ function crystalBrick() {
   g.translate(0,0,-.38); return g;
 }
 
+function addShieldInlays(parent, geometry, metal, gem, radius, height, scale) {
+  const plain = new THREE.InstancedMesh(geometry, metal, 8);
+  const jeweled = new THREE.InstancedMesh(geometry, gem, 4);
+  const stamp = new THREE.Object3D();
+  stamp.scale.fromArray(scale);
+  let plainIndex = 0, gemIndex = 0;
+  for (let i = 0; i < 12; i++) {
+    const angle = i * Math.PI / 6;
+    stamp.position.set(radius * Math.cos(angle), radius * Math.sin(angle), height);
+    stamp.rotation.z = angle;
+    stamp.updateMatrix();
+    if (i % 3 === 0) jeweled.setMatrixAt(gemIndex++, stamp.matrix);
+    else plain.setMatrixAt(plainIndex++, stamp.matrix);
+  }
+  parent.add(plain, jeweled);
+}
+
 /** More detailed presentation, retaining the tested game/dragon collision rules. */
 export class LuminousCrystalWorld extends CrystalWorld {
   constructor(scene, game) {
@@ -130,6 +147,8 @@ export class LuminousCrystalWorld extends CrystalWorld {
 
   makeCrystalField() {
     this.records=[]; this.fieldVersion=0;
+    this.surfaceVersion=-1;this.surfaceRecords=[];
+    this.sortDirection=new THREE.Vector3();
     const random=rng(8401), cursor=new THREE.Object3D();
     const palette=[0x4da9cd,0x74a8d4,0x65c3c9,0x969acb,0x9ccedf];
     for(let id=0;id<this.game.grid.length;id++) {
@@ -152,6 +171,7 @@ export class LuminousCrystalWorld extends CrystalWorld {
         body.geometry.setAttribute(name,new THREE.InstancedBufferAttribute(new Float32Array(this.records.length*3),3).setUsage(THREE.DynamicDrawUsage));
       }
       body.frustumCulled=false;body.userData.lastSort=-Infinity;body.userData.version=-1;
+      body.userData.sortDirection=new THREE.Vector3();
       // Allocate instanceColor before shader compilation.
       this.records.forEach((r,j)=>{body.setMatrixAt(j,r.matrix);body.setColorAt(j,r.color);});
       body.instanceColor.setUsage(THREE.DynamicDrawUsage);this.scene.add(body);
@@ -167,29 +187,48 @@ export class LuminousCrystalWorld extends CrystalWorld {
     for(const id of ids) { const r=this.byId.get(id); if(r) r.alive=false; }
     this.fieldVersion++;
   }
-  exposed(r) {
-    const {ix,iy,k}=r,g=this.game;
-    return !g.occupied(ix+1,iy,k)||!g.occupied(ix-1,iy,k)||!g.occupied(ix,iy+1,k)||
-      !g.occupied(ix,iy-1,k)||!g.occupied(ix,iy,k+1)||!g.occupied(ix,iy,k-1);
+  exposedCrystals() {
+    if (this.surfaceVersion === this.fieldVersion) return this.surfaceRecords;
+    const game = this.game;
+    this.surfaceRecords.length = 0;
+    for (const brick of this.records) {
+      if (!brick.alive) continue;
+      const { ix, iy, k } = brick;
+      const px = +!game.occupied(ix+1,iy,k), nx = +!game.occupied(ix-1,iy,k);
+      const py = +!game.occupied(ix,iy+1,k), ny = +!game.occupied(ix,iy-1,k);
+      const pz = +!game.occupied(ix,iy,k+1), nz = +!game.occupied(ix,iy,k-1);
+      if (!(px || py || pz || nx || ny || nz)) continue;
+      brick.openPositive ??= new THREE.Vector3();
+      brick.openNegative ??= new THREE.Vector3();
+      brick.openPositive.set(px, py, pz);
+      brick.openNegative.set(nx, ny, nz);
+      this.surfaceRecords.push(brick);
+    }
+    this.surfaceVersion = this.fieldVersion;
+    return this.surfaceRecords;
   }
   prepareView(camera,side,now) {
     const material=this.crystals.material;
     material.uniforms.uEye.value.copy(camera.position);
     this.wallMat.userData.eye.value.copy(camera.position);
     const body=side?this.sideCrystals:this.crystals;
-    if(now-body.userData.lastSort<120 && body.userData.version===this.fieldVersion) return;
-    // Separate instance buffers: sorting the side view cannot scramble the main view.
-    const direction=new THREE.Vector3();camera.getWorldDirection(direction);
-    const ordered=this.records.filter(r=>r.alive && this.exposed(r));
+    const cache=body.userData;
+    const changed=cache.version!==this.fieldVersion;
+    if(!changed && now-cache.lastSort<120) return;
+    const direction=camera.getWorldDirection(this.sortDirection);
+    if(!changed && cache.sortDirection.distanceToSquared(direction)<1e-10) return;
+    // Both cameras share the exposed faces. Each needs its own back-to-front order.
+    if(changed) cache.order=this.exposedCrystals().slice();
+    const ordered=cache.order;
+    cache.sortDirection.copy(direction);
     body.userData.logicalCount=this.game.remaining;
     ordered.sort((a,b)=>(b.p.x-a.p.x)*direction.x+(b.p.y-a.p.y)*direction.y+(b.p.z-a.p.z)*direction.z);
     const positive=body.geometry.attributes.aOpenPositive;
     const negative=body.geometry.attributes.aOpenNegative;
     ordered.forEach((r,i)=>{
       body.setMatrixAt(i,r.matrix);body.setColorAt(i,r.color);
-      const {ix,iy,k}=r;
-      positive.setXYZ(i,+!this.game.occupied(ix+1,iy,k),+!this.game.occupied(ix,iy+1,k),+!this.game.occupied(ix,iy,k+1));
-      negative.setXYZ(i,+!this.game.occupied(ix-1,iy,k),+!this.game.occupied(ix,iy-1,k),+!this.game.occupied(ix,iy,k-1));
+      positive.setXYZ(i,r.openPositive.x,r.openPositive.y,r.openPositive.z);
+      negative.setXYZ(i,r.openNegative.x,r.openNegative.y,r.openNegative.z);
     });
     positive.needsUpdate=true;negative.needsUpdate=true;
     body.count=ordered.length;body.instanceMatrix.needsUpdate=true;body.instanceColor.needsUpdate=true;
@@ -212,15 +251,9 @@ export class LuminousCrystalWorld extends CrystalWorld {
     const inset=mesh(new THREE.TorusGeometry(.39,.08,10,56),silver,root,0,0,.20);
     inset.rotation.z=.15;
     const runeGroup=new THREE.Group();root.add(runeGroup);
-    for(let i=0;i<12;i++) {
-      const a=i*Math.PI*2/12;
-      const spoke=mesh(new THREE.OctahedronGeometry(1,0),i%3===0?gem:silver,runeGroup,
-        Math.cos(a)*.76,Math.sin(a)*.76,.18);
-      spoke.scale.set(.40,.11,.09);spoke.rotation.z=a;
-      const tip=mesh(new THREE.OctahedronGeometry(1,0),i%3===0?gem:ice,root,
-        Math.cos(a)*1.19,Math.sin(a)*1.19,.07);
-      tip.scale.set(.23,.11,.15);tip.rotation.z=a;
-    }
+    const inlayGeometry=new THREE.OctahedronGeometry(1,0);
+    addShieldInlays(runeGroup,inlayGeometry,silver,gem,.76,.18,[.40,.11,.09]);
+    addShieldInlays(root,inlayGeometry,ice,gem,1.19,.07,[.23,.11,.15]);
     root.position.z=RULES.shieldZ;root.renderOrder=12;
     root.traverse(o=>{if(o.isMesh)o.renderOrder=12;});
     this.shield=root;this.shieldRings={tor,inner,runeGroup};this.scene.add(root);

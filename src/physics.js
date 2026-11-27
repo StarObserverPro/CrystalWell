@@ -82,8 +82,12 @@ export class CrystalWellGame {
   occupied(ix, iy, k) { return within(ix, iy, k) && this.grid[brickIndex(ix, iy, k)] === 1; }
   drainEvents() { const current = this.events; this.events = []; return current; }
 
+  get shieldTravelRadius() {
+    return RULES.wellRadius - (this.activeShieldRadius || RULES.shieldRadius) - 0.08;
+  }
+
   aim(x, y) {
-    const safeRadius = RULES.wellRadius - (this.activeShieldRadius || RULES.shieldRadius) - 0.08;
+    const safeRadius = this.shieldTravelRadius;
     const len = Math.hypot(x, y);
     const f = len > safeRadius ? safeRadius / len : 1;
     this.shield.targetX = x * f;
