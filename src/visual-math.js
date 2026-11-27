@@ -1,4 +1,5 @@
 import { BARRIER } from './barrier-math.js';
+import { RULES } from './physics.js';
 /** Renderer-independent presentation rules, shared by camera/input and tests. */
 export const CAMERA_TILT = Math.PI / 9; // 20 degrees away from the vertical.
 export const ORBIT_SPEED = Math.PI * 2 / 240;
@@ -17,11 +18,12 @@ export function viewBasis(time, reducedMotion = false) {
 // Distance means depth below the shield, not distance to the orbiting camera.
 // Colors are sRGB. The same palette is used by both views and the particle trail.
 export const HEAT_STOPS = Object.freeze([
-  [0, [0.23, 0.27, 1]], [.28, [.10, .73, 1]],
-  [.54, [.37, 1, .82]], [.77, [1, .76, .16]], [1, [1, .20, .065]],
+  [0, [.60, .32, .94]], [.28, [.44, .43, 1]], [.48, [.08, .74, 1]],
+  [.70, [.18, 1, .58]], [.84, [1, .76, .19]], [1, [1, .25, .095]],
 ]);
-export function depthHeat(z, shieldZ = 10.55, floorZ = BARRIER.z) {
-  const u = saturate((z - floorZ) / (shieldZ - floorZ));
+const heightFraction = (z, shieldZ, floorZ) => saturate((z - floorZ) / (shieldZ - floorZ));
+export function depthHeat(z, shieldZ = RULES.shieldZ, floorZ = BARRIER.z) {
+  const u = heightFraction(z, shieldZ, floorZ);
   let i = 1;
   while (i < HEAT_STOPS.length - 1 && u > HEAT_STOPS[i][0]) i++;
   const [a, ca] = HEAT_STOPS[i - 1], [b, cb] = HEAT_STOPS[i];
@@ -43,8 +45,14 @@ export class FrameMeter {
   }
 }
 
-/** Deliberately exaggerated perspective cue in a stable orthographic playfield. Physics is unchanged. */
-export function ballDepthScale(z, shieldZ=10.55, floorZ=BARRIER.z) {
-  const depth=saturate((shieldZ-z)/(shieldZ-floorZ));
-  return 1.30/(1+.585*depth);
+/** Modest scaling in the perspective side view. */
+export function ballDepthScale(z, shieldZ = RULES.shieldZ, floorZ = BARRIER.z) {
+  const depth = 1 - heightFraction(z, shieldZ, floorZ);
+  return 1.30 / (1 + .585 * depth);
+}
+
+/** Stronger size cues in the orthographic view, including the first bounce off the seal. */
+export function mainBallDepthScale(z) {
+  const height = heightFraction(z, RULES.shieldZ, BARRIER.z);
+  return .73 + 1.47 * height ** 2.35;
 }

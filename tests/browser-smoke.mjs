@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createServer } from 'node:http';
 import { checkTouchPad } from './touch-pad-browser.mjs';
+import { RULES, brickPosition } from '../src/physics.js';
 const root=process.cwd();
 await fs.mkdir('artifacts/renderer-deps',{recursive:true});
 for(const file of ['three.module.js','three.core.js']) await fs.copyFile(path.join(root,'node_modules/three/build',file),path.join('artifacts/renderer-deps',file));
@@ -38,6 +39,48 @@ async function shot(name) {
   await page.evaluate(()=>window.__crystalWell.drawFrame());
   await page.screenshot({path:`artifacts/${name}.png`,timeout:120000});
 }
+
+async function mainBallPixels(z) {
+  return page.evaluate(z => {
+    const q=window.__crystalWell,{game,world,renderer,topCamera}=q;
+    const radius=game.ball.radius;
+    game.state='playing';
+    game.time=.7;
+    Object.assign(game.ball,{x:1.2,y:1.4,z,vx:0,vy:0,vz:-7.4});
+    q.refresh();
+    const projected=world.ball.position.clone().project(topCamera);
+    const mainWidth=document.querySelector('#main-panel').getBoundingClientRect().width;
+    const dpr=renderer.getPixelRatio(), gl=renderer.getContext();
+    const x=Math.round((projected.x+1)*mainWidth*dpr/2);
+    const y=Math.round((projected.y+1)*innerHeight*dpr/2);
+    const halfWidth=Math.ceil(18*dpr), span=halfWidth*2+1;
+    const row=()=>{
+      const pixels=new Uint8Array(span*4);
+      gl.readPixels(x-halfWidth,y,span,1,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+      return pixels;
+    };
+    q.drawFrame();
+    const visible=row();
+    world.ghost.visible=false;
+    world.ball.visible=false;
+    world.ballHalo.visible=false;
+    q.drawFrame();
+    const hidden=row();
+    world.ghost.visible=true;
+    world.ball.visible=true;
+    world.ballHalo.visible=true;
+    const center=halfWidth*4;
+    const differs=i=>[0,1,2].reduce((sum,k)=>sum+Math.abs(visible[i*4+k]-hidden[i*4+k]),0)>80;
+    let left=halfWidth,right=halfWidth;
+    while(left>0 && differs(left-1))left--;
+    while(right<span-1 && differs(right+1))right++;
+    return {z,diameter:(right-left+1)/dpr,rgb:[...visible.slice(center,center+3)],
+      radius,mainLayerOnly:!world.ball.layers.test(topCamera.layers)&&world.ghost.layers.test(topCamera.layers),
+      overlayMeshes:world.ghost.children.filter(o=>o.isMesh).map(o=>o.geometry.type),
+      atPhysicalPosition:world.ghost.position.equals(world.ball.position)};
+  },z);
+}
+
 try{
   await page.goto(gameUrl,{waitUntil:'networkidle'});
   await page.waitForFunction(()=>window.__crystalWell?.assetsReady,{timeout:60000});
@@ -211,6 +254,24 @@ try{
   assert.equal(await page.evaluate(()=>{const q=window.__crystalWell;return Math.abs(q.sideTarget.width/q.sideTarget.height-(innerWidth-document.querySelector('#main-panel').getBoundingClientRect().width)/innerHeight)<.01;}),true,'Mobile side scene uses full height beneath the HUD');
   assert.equal(await page.evaluate(()=>{const h=window.__crystalWell.hud;return h.scoreGroup.position.x<200 &&
     h.fpsGroup.scale.x>=1 && parseFloat(document.querySelector('#pause').style.width)>=44;}),true,'Mobile score clears the rim and touch targets stay large');
+  const topCrystal = brickPosition(0,0,RULES.levels-1).z+RULES.brickHalf;
+  metrics.mainBall={};
+  for(const [name,z] of [['mouth',RULES.shieldZ-RULES.ballRadius],['seal',topCrystal+RULES.ballRadius],['dragon',-3.1]]) {
+    const sample=metrics.mainBall[name]=await mainBallPixels(z);
+    assert.equal(sample.radius,RULES.ballRadius);
+    assert.equal(sample.atPhysicalPosition,true);
+    assert.equal(sample.mainLayerOnly,true);
+    assert.deepEqual(sample.overlayMeshes,['IcosahedronGeometry'],'a single sphere, with no dark ring');
+    await shot(`ball-${name}`);
+  }
+  const {mouth,seal,dragon}=metrics.mainBall;
+  assert.ok(mouth.diameter>=19 && mouth.diameter/seal.diameter>=1.42 &&
+    mouth.diameter/dragon.diameter>=2.4 && dragon.diameter>=7,
+    `Readably different flight sizes in the main view: ${JSON.stringify(metrics.mainBall)}`);
+  assert.ok(mouth.rgb[0]-mouth.rgb[1]>85 && mouth.rgb[0]-mouth.rgb[2]>100, 'orange-red at the opening');
+  assert.ok(seal.rgb[1]-seal.rgb[0]>100 && seal.rgb[1]-seal.rgb[2]>45, 'green at the first crystal bounce');
+  assert.ok(dragon.rgb[2]-dragon.rgb[0]>95 && dragon.rgb[2]-dragon.rgb[1]>95, 'blue-violet at the dragon');
+  await page.evaluate(()=>{const q=window.__crystalWell;q.reset();q.freeze();q.refresh();});
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);
   await shot('portrait');
   assert.equal(await page.evaluate(()=>window.__crystalWell.hud.portrait.visible),true);

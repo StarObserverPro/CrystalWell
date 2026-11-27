@@ -6,7 +6,7 @@ The [v0.6 revision](V06-MATTE-SEA-PERFORMANCE.md) supersedes older art and optic
 
 Almost no explanatory text. All visible buttons, numbers, life crystals, progress clusters, effect symbols and portrait prompt are three-dimensional models. Transparent DOM controls exist for accessibility and input only. No fine outlines, wireframes or SVG HUD.
 
-Desktop and phone landscape only. The primary orthographic camera is tilted 20° from vertical and rotates once in 240 seconds. The secondary perspective camera stays orthogonal and updates at 18 Hz desktop / 14 Hz touch. A translucent disc over the lower right maps touch positions to the shield plane using the primary camera’s screen axes. The secondary camera provides the depth view. Mouse input uses the main view directly. Ball heat color encodes distance from the opening.
+Desktop and phone landscape only. The primary orthographic camera is tilted 20° from vertical and rotates once in 240 seconds. The secondary perspective camera stays orthogonal and updates at 18 Hz desktop / 14 Hz touch. A translucent disc over the lower right maps touch positions to the shield plane using the primary camera’s screen axes. The secondary camera provides the depth view. Mouse input uses the main view directly.
 
 ## Space and collisions
 
@@ -21,6 +21,8 @@ Local fracture, periodic resonance and a small final collapse remove crystals. V
 Pointer movement / touch drag moves the shield; click-release, touch-release or Space launches a held ball. Esc toggles pause without key-repeat toggles; P is compatible, R restarts, arrows/WASD move. Losing focus pauses.
 
 Ordinary shield contact is an immediate rebound with shield compression and downward particles. A miss destroys the ball and leaves the shield empty for about 0.85 seconds before a cyan-petal replacement appears. Bind magic alone causes a catch, shown by a purple ball beacon above the shield, charge gems and a pulsing launch symbol. Cyan is a fresh serve; the physical ball is hidden while held so there is only one ball indicator. Both views render the beacon through occluders. Both held states wait for explicit input; neither silently auto-launches.
+
+In the main view, a shaded sphere shows the ball at its actual flight position through the crystal. It grows and shifts from blue-violet at the dragon through green at the top of the seal to orange-red at the opening. Size and color follow the height below the shield throughout the camera orbit. The sphere uses the fixed gameplay collision radius with a separate visual scale.
 
 ## Score and pickups
 
