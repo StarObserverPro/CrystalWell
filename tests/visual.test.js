@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CAMERA_TILT, viewBasis, depthHeat, HEAT_STOPS, FrameMeter } from '../src/visual-math.js';
+import { CAMERA_TILT, viewBasis, depthHeat, HEAT_STOPS, FrameMeter, mainBallDepthScale } from '../src/visual-math.js';
+import { RULES, brickPosition } from '../src/physics.js';
 const dot = (a,b) => a.reduce((v,x,i)=>v+x*b[i],0);
 const near = (a,b) => assert.ok(Math.abs(a-b)<1e-9, `${a} != ${b}`);
 test('main view is tilted 20 degrees; side is exactly orthogonal throughout orbit', () => {
@@ -28,6 +29,13 @@ test('ball heat is clamped, continuous and uses depth rather than camera angle',
     assert.ok(a.every(x=>Number.isFinite(x)&&x>=0&&x<=1));
     assert.ok(a.every((x,i)=>Math.abs(x-b[i])<.01));
   }
+});
+test('the main view gives the first bounce and the dragon distinct visual sizes', () => {
+  const mouth = RULES.shieldZ - RULES.ballRadius;
+  const firstBounce = brickPosition(0, 0, RULES.levels - 1).z + RULES.brickHalf + RULES.ballRadius;
+  assert.ok(mainBallDepthScale(mouth) / mainBallDepthScale(firstBounce) > 1.5);
+  assert.ok(mainBallDepthScale(mouth) / mainBallDepthScale(-3.1) > 2.5);
+  for (let z = -10; z < 11; z += .1) assert.ok(mainBallDepthScale(z + .1) >= mainBallDepthScale(z));
 });
 test('FPS uses raw rendered timestamps and actual side passes, not capped physics dt',()=>{
   const meter=new FrameMeter();meter.record(0);

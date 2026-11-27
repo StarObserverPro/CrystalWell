@@ -7,7 +7,7 @@ import { emblem } from './icons-3d.js';
 import { crystal,put } from './model-kit.js';
 import { QUALITY } from './quality.js';
 import { MagicSea } from './magic-sea.js';
-import { ballDepthScale } from './visual-math.js';
+import { ballDepthScale, mainBallDepthScale } from './visual-math.js';
 
 const COLORS={wide:0x71e6d6,slow:0x8aaeff,bind:0xca98ff,treasure:0xffd383};
 export class RefinedCrystalWorld extends LuminousCrystalWorld {
@@ -32,13 +32,6 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     this.bindGems=[];
     for(let i=0;i<3;i++){const m=put(this.shield,new THREE.OctahedronGeometry(.14,0),this.holdMaterial,[-.35+i*.35,.98,.58]);m.renderOrder=90;this.bindGems.push(m);}
     this.predictor.geometry.dispose();this.predictor.geometry=new THREE.OctahedronGeometry(.42,0);this.predictor.material.opacity=.4;
-    // Narrow dark rims keep the shield and the flight glint legible over pale facets.
-    const contrast=new THREE.MeshBasicMaterial({color:0x102738,transparent:true,opacity:.80,
-      depthTest:false,depthWrite:false,toneMapped:false});
-    const backing=put(this.shield,new THREE.RingGeometry(RULES.shieldRadius-.22,RULES.shieldRadius+.15,72),contrast);
-    backing.layers.set(1);backing.renderOrder=11;
-    this.flightRim=put(this.ghost,new THREE.RingGeometry(.24,.36,36),contrast);
-    this.flightRim.layers.set(1);this.flightRim.renderOrder=59;
   }
   makeAtmosphere(){
     const scene=this.scene;
@@ -101,7 +94,8 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     this.heldCue.visible=held;this.launchGlyph.visible=held;this.predictor.visible=!held&&!hidden&&this.predictor.visible;
     const scale=ballDepthScale(g.ball.z);
     this.ball.scale.setScalar(scale);this.ballHalo.scale.set(1.7*scale,1.7*scale,1);
-    this.ghost.scale.setScalar(scale);this.sideGhost.scale.set(1.75*scale,1.75*scale,1);
+    this.ghost.scale.setScalar(mainBallDepthScale(g.ball.z));
+    this.sideGhost.scale.set(1.75*scale,1.75*scale,1);
     this.sea.update(t,rise);
     this.heldCore.scale.setScalar(1+Math.sin(t*3)*.08);
     this.holdMaterial.color.set(g.readyReason==='capture'?0xd2a0ff:0x87fff2);
@@ -123,7 +117,6 @@ export class RefinedCrystalWorld extends LuminousCrystalWorld {
     this.wilderness.visible=false;this.wildernessRocks.visible=false;
     // These are 3D solid silhouettes, billboarded per actual rendering camera, not flat SVGs.
     const q=camera.quaternion;
-    if(!side && this.ghost.visible)this.flightRim.quaternion.copy(q);
     if(this.launchGlyph.visible)this.launchGlyph.quaternion.copy(q);
     for(const root of this.bubbles)if(root.visible) {
       for(const icon of Object.values(root.userData.icons))if(icon.visible)icon.quaternion.copy(q);

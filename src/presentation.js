@@ -5,6 +5,32 @@ import { RULES, brickPosition } from './physics.js';
 import { depthHeat } from './visual-math.js';
 import { makeReflectionEnvironment, makeCrystalMaterial, arcBlock, wallMaterial } from './crystal-material.js';
 
+const white = new THREE.Color(0xffffff);
+
+function flightBallMaterial() {
+  return new THREE.ShaderMaterial({
+    transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
+    uniforms: { uColor: { value: new THREE.Color() } },
+    vertexShader: `
+      varying vec3 vSurfaceNormal;
+      void main() {
+        vSurfaceNormal = normalMatrix * normal;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
+      }`,
+    fragmentShader: `
+      uniform vec3 uColor;
+      varying vec3 vSurfaceNormal;
+      void main() {
+        vec3 normal = normalize(vSurfaceNormal);
+        float light = .48 + .52 * max(0., dot(normal, normalize(vec3(-.46, .54, .71))));
+        float gloss = pow(max(0., dot(normal, normalize(vec3(-.28, .36, .89)))), 36.);
+        vec3 reflected = mix(uColor, vec3(1., .97, .91), .48);
+        gl_FragColor = vec4(mix(uColor * light, reflected, gloss * .48), 1.);
+        #include <colorspace_fragment>
+      }`,
+  });
+}
+
 function rng(seed) {
   return () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) / 4294967296; };
 }
@@ -260,21 +286,34 @@ export class LuminousCrystalWorld extends CrystalWorld {
   }
   makeBall() {
     super.makeBall();
-    // A true-position x-ray silhouette replaces the old, misleading Z-flattened dot.
-    const dot=this.ghost.children[1];dot.geometry.dispose();
-    dot.geometry=new THREE.IcosahedronGeometry(.24,1);
-    this.ghost.traverse(o=>{o.renderOrder=60;});
-    this.ballHalo.scale.set(1.7,1.7,1);this.ghost.children[0].scale.set(1.6,1.6,1);
-    this.predictor.renderOrder=61;this.predictor.scale.setScalar(.7);
+    const [glow, core] = this.ghost.children;
+    core.geometry.dispose();
+    core.material.dispose();
+    core.geometry = this.ball.geometry;
+    core.material = flightBallMaterial();
+    core.name = 'Main-view flight ball';
+    this.ghost.renderOrder = 60;
+    core.renderOrder = 60;
+    glow.scale.set(1.55, 1.55, 1);
+    glow.material.toneMapped = false;
+    glow.renderOrder = 59;
+    // Each view draws a single solid ball. The main view reads through the seal.
+    this.ball.layers.set(2);
+    this.ballHalo.layers.set(2);
+    this.ballHalo.scale.set(1.7, 1.7, 1);
+    this.predictor.renderOrder = 58;
+    this.predictor.scale.setScalar(.7);
   }
   update(dt,t,winRise=0) {
     super.update(dt,t,winRise);
     const color=this.heatColor; color.setRGB(...depthHeat(this.game.ball.z),THREE.SRGBColorSpace);
-    this.ball.material.color.copy(color).lerp(new THREE.Color(0xffffff),.37);
+    this.ball.material.color.copy(color).lerp(white,.37);
     this.ballHalo.material.color.copy(color);this.sideGhost.material.color.copy(color);
     this.ghost.position.copy(this.ball.position);
-    this.ghost.children[0].material.color.copy(color);
-    this.ghost.children[1].material.color.copy(color).lerp(new THREE.Color(0xffffff),.4);
+    const [glow, core] = this.ghost.children;
+    glow.material.color.copy(color);
+    glow.material.opacity = .12;
+    core.material.uniforms.uColor.value.copy(color);
     this.predictor.position.z=RULES.shieldZ+.04;
     this.predictor.material.color.copy(color);
     for(let i=0;i<this.movingLights.length;i++) {
