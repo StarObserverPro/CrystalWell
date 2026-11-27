@@ -6,6 +6,18 @@ body { user-select:none; -webkit-user-select:none; touch-action:none; }
 .stage { position:absolute; inset:0; width:100%; height:100%; display:block; z-index:0; }
 #main-panel { position:absolute; inset:0 auto 0 0; width:66%; touch-action:none; z-index:1; cursor:crosshair; }
 #side-panel { position:absolute; inset:0 0 0 66%; pointer-events:none; z-index:1; }
+#shield-pad {
+  --thumb-inset: max(14px, calc(env(safe-area-inset-right, 0px) + 8px));
+  position:absolute;
+  right:var(--thumb-inset);
+  bottom:max(54px, calc(env(safe-area-inset-bottom, 0px) + 38px));
+  width:min(72%, 44vh, 232px, calc(100% - var(--thumb-inset) - 6px));
+  aspect-ratio:1;
+  border-radius:50%;
+  touch-action:none;
+  pointer-events:auto;
+}
+#shield-pad[inert] { visibility:hidden; pointer-events:none; }
 .hit-target { position:absolute; z-index:5; border:0; outline:0; padding:0; margin:0; background:transparent; box-shadow:none; cursor:pointer; touch-action:manipulation; }
 .hit-target[hidden] { display:none; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }

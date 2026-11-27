@@ -11,6 +11,8 @@ import { MagicMotes } from './vfx.js';
 const app = document.getElementById('app');
 const mainPanel = document.getElementById('main-panel');
 const sidePanel = document.getElementById('side-panel');
+const padElement = document.getElementById('shield-pad');
+const coarsePointer = matchMedia('(any-pointer: coarse)');
 const elements = {
   pause: document.getElementById('pause'), sound: document.getElementById('sound'),
   restart: document.getElementById('restart'), center: document.getElementById('center-action'),
@@ -80,7 +82,6 @@ let playingLandscape = true;
 let previousTime = performance.now();
 let accumulator = 0;
 let lastSideFrame = -1e5;
-let lastHudUpdate = 0;
 let lastMoteTime = 0;
 let lastWinBurst = 0;
 let width = 1, height = 1, mainWidth = 1, sideWidth = 1;
@@ -88,12 +89,14 @@ let sideHeight = 1;
 let sideFps = 18;
 let sideDistance = 40;
 const cameraTarget = new THREE.Vector3(0, 0, 5.3);
+const sideFocus = new THREE.Vector3(0, 0, .3);
 const raycaster = new THREE.Raycaster();
 const shieldPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -RULES.shieldZ);
 const pointer = new THREE.Vector2();
 const hitPoint = new THREE.Vector3();
-let lastPointer = null;
+let aimSurface = null;
 let pointerGesture = null;
+let mainBounds, padBounds, cameraBasis;
 const keys = new Set();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let soundEnabled = true;
@@ -125,15 +128,26 @@ function chime(type, extra = 0) {
 
 function updateHud(now = performance.now()) {
   hud.update(now / 1000, paused, soundEnabled, playingLandscape, frameMeter.value);
+  const showPad = canAim() && (coarsePointer.matches || navigator.maxTouchPoints > 0);
+  if (hud.shieldPad.visible !== showPad) {
+    hud.shieldPad.visible = showPad;
+    padElement.inert = !showPad;
+    if (!showPad && pointerGesture?.surface === padElement) cancelGesture();
+  }
+  if (showPad) hud.shieldPad.track(game, cameraBasis, pointerGesture?.surface === padElement);
 }
 
 function resize() {
   const bounds = app.getBoundingClientRect();
+  if (bounds.width !== width || bounds.height !== height) cancelGesture();
   width = Math.max(1, Math.floor(bounds.width));
   height = Math.max(1, Math.floor(bounds.height));
   const layout=composition(width,height);
   mainWidth=layout.mainWidth;sideWidth=layout.sideWidth;
   mainPanel.style.width=`${mainWidth}px`;sidePanel.style.left=`${mainWidth}px`;
+  mainBounds = mainPanel.getBoundingClientRect();
+  padBounds = padElement.getBoundingClientRect();
+  hud.shieldPad.layout(padBounds, bounds);
   renderer.setSize(width, height, false);
   playingLandscape = window.innerWidth > window.innerHeight;
   const aspect = mainWidth / height;
@@ -160,41 +174,80 @@ function resize() {
 
 function updateCameras() {
   const basis = viewBasis(game.time, reducedMotion);
+  cameraBasis = basis;
   topCamera.position.fromArray(basis.main).multiplyScalar(36).add(cameraTarget);
   topCamera.up.fromArray(basis.up);
   topCamera.lookAt(cameraTarget); topCamera.updateMatrixWorld(true);
-  const sideFocus=new THREE.Vector3(0,0,.3);
   sideCamera.position.fromArray(basis.side).multiplyScalar(sideDistance).add(sideFocus);
   sideCamera.lookAt(sideFocus); sideCamera.updateMatrixWorld(true);
 }
-function reprojectPointer() {
-  if (!lastPointer || !playingLandscape || paused) return;
-  const r = mainPanel.getBoundingClientRect();
-  if (r.width < 1 || r.height < 1) return;
-  pointer.set(clamp((lastPointer.x-r.left)/r.width,0,1)*2-1,
-    1-clamp((lastPointer.y-r.top)/r.height,0,1)*2);
-  raycaster.setFromCamera(pointer, topCamera);
-  if (raycaster.ray.intersectPlane(shieldPlane, hitPoint)) game.aim(hitPoint.x, hitPoint.y);
+function canAim() {
+  return assetsReady && playingLandscape && !paused && game.state !== 'lost' && game.state !== 'won';
 }
+
+function reprojectPointer() {
+  if (!aimSurface || !canAim()) return;
+  if (aimSurface === padElement) {
+    const { right, screenUp } = cameraBasis;
+    const radius = game.shieldTravelRadius;
+    game.aim(radius * (pointer.x * right[0] + pointer.y * screenUp[0]),
+      radius * (pointer.x * right[1] + pointer.y * screenUp[1]));
+  } else {
+    raycaster.setFromCamera(pointer, topCamera);
+    if (raycaster.ray.intersectPlane(shieldPlane, hitPoint)) game.aim(hitPoint.x, hitPoint.y);
+  }
+}
+
 function aimFromPointer(event) {
-  lastPointer = { x: event.clientX, y: event.clientY };
+  aimSurface = event.currentTarget;
+  const r = aimSurface === padElement ? padBounds : mainBounds;
+  pointer.set((event.clientX - r.left) * 2 / r.width - 1, 1 - (event.clientY - r.top) * 2 / r.height);
+  // Captured drags can leave the disc. Clamping radially keeps the thumb direction.
+  if (aimSurface === padElement) pointer.clampLength(0, 1);
+  else pointer.clampScalar(-1, 1);
   reprojectPointer();
 }
-mainPanel.addEventListener('pointerleave', () => { lastPointer = null; });
-mainPanel.addEventListener('pointercancel', () => { lastPointer = null; pointerGesture = null; });
-mainPanel.addEventListener('pointermove', e => { if (!paused) aimFromPointer(e); });
-mainPanel.addEventListener('pointerdown', e => {
-  if (!assetsReady || paused || !playingLandscape || e.target.closest('button') || e.button !== 0 || !e.isPrimary) return;
-  document.activeElement?.blur?.();
-  pointerGesture = { id: e.pointerId, held: game.held, heldSince: game.heldSince };
-  initAudio(); mainPanel.setPointerCapture?.(e.pointerId); aimFromPointer(e);
-});
-mainPanel.addEventListener('pointerup', e => {
-  if (mainPanel.hasPointerCapture?.(e.pointerId)) mainPanel.releasePointerCapture(e.pointerId);
-  const gesture = pointerGesture; pointerGesture = null;
-  if (assetsReady && !paused && playingLandscape && game.held && gesture?.id === e.pointerId
-      && gesture.held && gesture.heldSince === game.heldSince) game.launch();
-  if (e.pointerType !== 'mouse') lastPointer = null;
+
+function cancelGesture() {
+  const owner = pointerGesture;
+  pointerGesture = null;
+  aimSurface = null;
+  if (owner?.surface.hasPointerCapture(owner.id)) owner.surface.releasePointerCapture(owner.id);
+}
+
+function ownsGesture(event) {
+  return pointerGesture?.id === event.pointerId && pointerGesture.surface === event.currentTarget;
+}
+
+for (const surface of [mainPanel, padElement]) {
+  surface.addEventListener('pointerdown', event => {
+    if (!canAim() || pointerGesture || event.button !== 0) return;
+    if (surface === mainPanel && (!event.isPrimary || event.pointerType === 'touch')) return;
+    if (surface === padElement && padElement.inert) return;
+    document.activeElement?.blur?.();
+    pointerGesture = { surface, id: event.pointerId, held: game.held, heldSince: game.heldSince };
+    initAudio();
+    surface.setPointerCapture(event.pointerId);
+    aimFromPointer(event);
+  });
+  surface.addEventListener('pointermove', event => {
+    const hover = !pointerGesture && surface === mainPanel && event.pointerType !== 'touch' && event.isPrimary;
+    if (canAim() && (ownsGesture(event) || hover)) aimFromPointer(event);
+  });
+  surface.addEventListener('pointerup', event => {
+    if (!ownsGesture(event)) return;
+    const { held, heldSince } = pointerGesture;
+    aimFromPointer(event);
+    cancelGesture();
+    if (surface === mainPanel && event.pointerType === 'mouse' && surface.matches(':hover')) aimSurface = surface;
+    if (canAim() && held && game.held && heldSince === game.heldSince) game.launch();
+  });
+  for (const type of ['pointercancel', 'lostpointercapture']) {
+    surface.addEventListener(type, event => { if (ownsGesture(event)) cancelGesture(); });
+  }
+}
+mainPanel.addEventListener('pointerleave', () => {
+  if (!pointerGesture && aimSurface === mainPanel) aimSurface = null;
 });
 window.addEventListener('keydown', event => {
   // A focused accessible control owns Space/Enter; never turn its activation into a shot.
@@ -207,7 +260,7 @@ window.addEventListener('keydown', event => {
   if (event.key.toLowerCase() === 'r' && !event.repeat) { reset(); return; }
   if (paused || !playingLandscape) return;
   keys.add(event.key.toLowerCase());
-  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','s','d','w'].includes(event.key)) lastPointer = null;
+  if (['arrowleft','arrowright','arrowup','arrowdown','a','s','d','w'].includes(event.key.toLowerCase())) aimSurface = null;
   if (assetsReady && event.key === ' ' && game.held && !event.repeat) { initAudio(); game.launch(); }
 });
 window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
@@ -219,13 +272,13 @@ document.addEventListener('visibilitychange', () => {
 
 function reset() {
   game.restart(); world.resetField(); vfx.clear();world.sea.reset();
-  accumulator = 0; lastPointer = null; pointerGesture = null; lastSideFrame = -1e5; keys.clear();
+  cancelGesture(); accumulator = 0; lastSideFrame = -1e5; keys.clear();
   frameMeter.reset(); updateCameras(); paused = false; simulationFrozen = false;
   world.update(0, game.time); updateHud();
 }
 function setPaused(value) {
   if (game.state === 'lost' || game.state === 'won') return;
-  paused = value; keys.clear(); lastPointer = null; pointerGesture = null; accumulator = 0;
+  paused = value; keys.clear(); cancelGesture(); accumulator = 0;
   previousTime = performance.now(); frameMeter.reset(); updateHud();
   elements.pause.setAttribute('aria-label', paused ? '继续游戏' : '暂停游戏');
 }
@@ -248,6 +301,7 @@ for (const control of [elements.pause, elements.sound, elements.restart, element
 const observer = new ResizeObserver(resize);
 observer.observe(app);
 window.addEventListener('resize', resize);
+coarsePointer.addEventListener('change', resize);
 resize();
 updateHud();
 
@@ -329,7 +383,7 @@ function frame(now) {
       const mx = (keys.has('arrowright') || keys.has('d') ? 1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1 : 0);
       const my = (keys.has('arrowup') || keys.has('w') ? 1 : 0) - (keys.has('arrowdown') || keys.has('s') ? 1 : 0);
       if (mx || my) {
-        const basis = viewBasis(game.time, reducedMotion);
+        const basis = cameraBasis;
         game.aim(game.shield.targetX + (mx*basis.right[0]+my*basis.screenUp[0])*dt*13,
           game.shield.targetY + (mx*basis.right[1]+my*basis.screenUp[1])*dt*13);
       }
@@ -354,9 +408,6 @@ function frame(now) {
     }
     world.update(dt, game.time, rise);
     vfx.update(dt, game.time);
-    if (now - lastHudUpdate > 120 || game.state === 'won') {
-      updateHud(); lastHudUpdate = now;
-    }
   }
   render(now);
 }

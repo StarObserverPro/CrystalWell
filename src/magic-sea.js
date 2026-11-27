@@ -30,10 +30,13 @@ export class MagicSea {
         vec3 environment(vec3 d){return texture2D(uEnvironment,vec2(atan(d.z,d.x)*.15915494+.5,asin(clamp(d.y,-1.,1.))*.31830989+.5)).rgb;}
         void main(){
           vec3 N=normalize(vNormal),V=normalize(uEye-vWorld);float f=pow(1.-abs(dot(N,V)),3.);
-          float wave=pow(1.-abs(sin(vWorld.x*1.15+vWorld.y*.73+uTime*.65)*sin(vWorld.y*1.38-vWorld.x*.49-uTime*.52)),10.);
+          vec2 phase=vec2(vWorld.x*1.15+vWorld.y*.73+uTime*.65,vWorld.y*1.38-vWorld.x*.49-uTime*.52);
+          vec2 footprint=fwidth(phase);
+          float detail=1.-smoothstep(.24,1.3,max(footprint.x,footprint.y));
+          float wave=mix(.18,pow(1.-abs(sin(phase.x)*sin(phase.y)),10.),detail);
           float swell=.5+.5*sin(vWorld.x*.29-vWorld.y*.37+uTime*.55);
           vec3 color=mix(vec3(.018,.15,.24),vec3(.05,.31,.33),swell);
-          color+=environment(reflect(-V,N))*.15*(.22+f)+vec3(.06,.32,.40)*wave*.65;
+          color+=environment(reflect(-V,N))*.15*(.22+f)+vec3(.06,.32,.40)*wave*.50;
           float ripple=0.;for(int i=0;i<6;i++){
             float age=uTime-uImpacts[i].z;
             if(age>=0.&&age<2.4){float d=length(vWorld.xy-uImpacts[i].xy);ripple+=exp(-pow((d-age*3.2)*2.7,2.))*exp(-age*1.25)*uImpacts[i].w;}

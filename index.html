@@ -12,8 +12,10 @@
 </head>
 <body>
   <div id="app" aria-label="水晶之井，三维打砖块游戏">
-    <section id="main-panel" aria-label="俯视井口，移动鼠标或拖动控制圆盾，点按或空格发射，Escape暂停"></section>
-    <aside id="side-panel" aria-label="低帧率侧视图"></aside>
+    <section id="main-panel" aria-label="俯视井口，鼠标或方向键移动圆盾，点击或空格发射，Escape 暂停"></section>
+    <aside id="side-panel" aria-label="井中侧视图">
+      <div id="shield-pad" role="group" aria-label="圆盾触控盘，在盘内拖动可移动左侧井口的圆盾，持球时松手发射" inert></div>
+    </aside>
     <!-- Accessible hit areas only. All visible buttons, numbers and indicators are actual 3D meshes. -->
     <button id="pause" class="hit-target" aria-label="暂停或继续" title="Esc"></button>
     <button id="sound" class="hit-target" aria-label="关闭声音"></button>

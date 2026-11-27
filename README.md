@@ -12,7 +12,9 @@ python3 -m http.server 8000
 
 Open `http://localhost:8000`. Three.js `0.187.0` is pinned in the import map and loaded from jsDelivr; an initial internet connection is required. An offline distribution may vendor the same version and update the import map. Preserve `.openai/hosting.json` when deploying.
 
-Move the mouse or drag a finger in the main view to move the shield. Click/touch-release or **Space** launches a held ball. **Esc** pauses/resumes; P also works. Arrows/WASD move the shield; R restarts. Portrait shows a rotating 3D phone prompt instead of a cramped game.
+On a touchscreen, turn the device sideways and drag on the translucent disc in the lower right. Its center maps to the center of the left well, and its edge maps to the shield's travel limit. Drag in the direction you want the shield to move on screen, even as the camera orbits. The small ring in the disc follows the shield. Lift your finger to launch a ball you were already holding when you touched down.
+
+On desktop, move the mouse over the main view or use the arrow keys/WASD to move the shield. Click or press **Space** to launch. **Esc** or P pauses and resumes. R restarts. Portrait shows a rotating 3D phone prompt.
 
 Normal shield contact rebounds immediately. Only the purple bind pickup enables capture. New-life serves and captured balls both wait for explicit release: cyan crystal petals mean a new ball, purple petals mean a captured ball. A pulsing sculpted launch symbol marks the held state. Missing a ball briefly leaves the shield empty before a replacement appears. There are **three lives**.
 
