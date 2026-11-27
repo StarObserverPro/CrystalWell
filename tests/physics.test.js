@@ -19,12 +19,37 @@ test('front-facing wall has a connected indentation and the bottom allows a drag
   assert.equal(grid[brickIndex(6, 6, 0)], 1);
 });
 
-test('lowered seal leaves extra shield recovery space without removing the eight brick layers', () => {
+test('lowered eight-layer seal leaves a full recovery zone above the crystals', () => {
   const top = RULES.brickBottom + (RULES.levels - 1) * RULES.brickStep + RULES.brickHalf;
-  const bottom = RULES.brickBottom - RULES.brickHalf;
-  assert.ok(RULES.shieldZ - top >= 2.0, `too little room for player: ${RULES.shieldZ - top}`);
-  assert.ok(bottom < 0.9, `seal is too far from the dragon: ${bottom}`);
+  assert.ok(RULES.shieldZ - top >= 6, `too little room for player: ${RULES.shieldZ - top}`);
   assert.equal(RULES.levels, 8);
+});
+
+test('a centered serve and return from the highest crystals give the player time to react', () => {
+  const game = new CrystalWellGame();
+  const dt = 1 / 120;
+  game.aim(0, 0);
+  for (let i = 0; i < 48; i++) game.moveShield(dt);
+  game.launch();
+  game.drainEvents();
+  let firstHit = 0, returnHit = 0;
+  for (let i = 0; i < 240 && !returnHit; i++) {
+    const { x, y, z, vx, vy, vz, radius } = game.ball;
+    if (vz > 0) {
+      const travel = Math.max(0, (RULES.shieldZ - radius - z) / vz);
+      game.aim(x + vx * travel, y + vy * travel);
+    }
+    game.step(dt);
+    for (const event of game.drainEvents()) {
+      if (event.type === 'crystal' && !firstHit) {
+        assert.equal(event.z, brickPosition(0, 0, RULES.levels - 1).z);
+        firstHit = game.time;
+      }
+      if (event.type === 'shield') returnHit = game.time;
+    }
+  }
+  assert.ok(firstHit >= .68, `first impact at ${firstHit}s`);
+  assert.ok(returnHit - firstHit >= .70, `return took ${returnHit - firstHit}s`);
 });
 
 test('break event removes genuine occupied voxels and reports progress', () => {

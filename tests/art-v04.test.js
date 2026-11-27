@@ -6,7 +6,7 @@ import { restartOutline } from '../src/symbol-shapes.js';
 import { composition } from '../src/composition.js';
 import { installDragonSurface,dragonBrow } from '../src/dragon-shape.js';
 import { AdventureGame } from '../src/gameplay.js';
-import { RULES } from '../src/physics.js';
+import { RULES, brickPosition } from '../src/physics.js';
 import { fitDragonPoint,headWeight,isFaceCore } from '../src/dragon-anatomy.js';
 
 test('restart arrow is one non-self-intersecting continuous outline',()=>{
@@ -33,7 +33,7 @@ test('external model is bundled, hash-verified and licensed, not the generated h
   assert.equal(provenance.origin.ai_content,true);
   assert.match(fs.readFileSync('src/dragon.js','utf8'),/GLTFLoader/);
 });
-test('actual imported sculpt supplies finite collision heights and can still clear the seal',()=>{
+test('the imported brow has room under the lowered seal and the stage can be cleared',()=>{
   const file=fs.readFileSync('assets/dragon/chinese-dragon-source.glb'),len=file.readUInt32LE(12);
   const data=JSON.parse(file.toString('utf8',20,20+len)),access=data.accessors[0],view=data.bufferViews[access.bufferView];
   const start=20+len+8+(view.byteOffset||0)+(access.byteOffset||0),pos=[],weights=[];
@@ -43,8 +43,22 @@ test('actual imported sculpt supplies finite collision heights and can still cle
     if(isFaceCore(x,y,z)&&Math.abs(p[0])<8.65&&Math.abs(p[1])<8.1){pos.push(...p);weights.push(headWeight(x,y,z));}
   }
   installDragonSurface(pos,weights);
-  for(let y=-8;y<=8;y+=2)for(let x=-8;x<=8;x+=2){const b=dragonBrow(x,y,0);assert.ok(Number.isFinite(b.z+b.nx+b.ny+b.nz));assert.ok(b.z<=2.3);}
   const g=new AdventureGame();
+  const lowestBricks=[];
+  for(let iy=0;iy<RULES.cells;iy++)for(let ix=0;ix<RULES.cells;ix++){
+    if(g.occupied(ix,iy,0))lowestBricks.push(brickPosition(ix,iy,0));
+  }
+  const reach=RULES.brickHalf+RULES.ballRadius;
+  const offsets=[-1,-2/3,-1/3,0,1/3,2/3,1].map(offset=>offset*reach);
+  let clearance=Infinity;
+  for(let time=0;time<=24;time+=.37){
+    for(const {x,y,z} of lowestBricks)for(const dx of offsets)for(const dy of offsets){
+      const brow=dragonBrow(x+dx,y+dy,time);
+      clearance=Math.min(clearance,z-RULES.brickHalf-brow.z);
+    }
+  }
+  assert.ok(clearance>=2*RULES.ballRadius && clearance<1,
+    `smallest sampled passage above the sculpt is ${clearance} world units`);
   for(let i=0;i<120*1200&&g.state!=='won'&&g.state!=='lost';i++){
     if(g.held)g.launch();const b=g.ball,t=b.vz>0?Math.max(0,(RULES.shieldZ-b.z)/b.vz):0;
     g.aim(b.x+b.vx*t,b.y+b.vy*t);g.step(1/120);g.drainEvents();

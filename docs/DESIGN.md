@@ -10,9 +10,9 @@ Desktop and phone landscape only. The primary orthographic camera is tilted 20°
 
 ## Space and collisions
 
-The well radius is 9.72. A 20×20 grid clipped to radius 9.1 holds eight vertical crystal layers: 1,926 occupied cells, including many radial layers. The front (-Y) has a connected, multi-height notch. This is a filled cylinder, not a thin barrel.
+The well radius is 9.72. A 20×20 grid clipped to radius 9.1 holds eight crystal layers with 1,892 occupied cells. The front (-Y) has a connected notch across several layers. The lowest layer has a recess over the moving dragon's brow.
 
-The circular shield is at Z=10.55, base radius 1.32, and moves in XY. Upward balls that contact it rebound downward. Missing the opening costs one of three lives. Well-wall and floor bounces are safe. The fitted facial core is approximately 15.55 units across the 19.44-unit opening, excluding decorative appendages. A coarse moving height field sampled from the imported mesh handles collisions; the triangle mesh is never a per-frame collider.
+The circular shield is at Z=10.55, 6.07 units above the highest crystal face. It has a base radius of 1.32 and moves in XY. Upward balls that contact it rebound downward. Missing the opening costs one of three lives. Well-wall and floor bounces are safe. The fitted facial core is approximately 15.55 units across the 19.44-unit opening, excluding decorative appendages. A coarse moving height field sampled from the imported mesh handles collisions.
 
 Local fracture, periodic resonance and a small final collapse remove crystals. Victory requires zero crystals, followed by the full dragon's rise. The restart model waits until the reveal animation has been shown.
 

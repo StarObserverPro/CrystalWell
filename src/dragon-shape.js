@@ -45,6 +45,11 @@ export function dragonBrow(x,y,time) {
   // Deterministic test/loading fallback. Asset readiness still gates real play.
   const p=dragonPose(time),rx=x-p.x,ry=y-p.y,inside=(rx/DRAGON.browX)**2+(ry/DRAGON.browY)**2<1;
   if(!inside)return barrierSurface(x,y,time);
-  const z=.83+.14*Math.cos(rx*.45)+.12*Math.sin(ry*.55+time*.8),nx=.063*Math.sin(rx*.45),ny=-.066*Math.cos(ry*.55+time*.8),l=Math.hypot(nx,ny,1);
+  const browX=(rx-2.2)/2.8,browY=(ry+4.1)/2.4;
+  const crest=1.55*Math.exp(-browX*browX-browY*browY);
+  const wave=ry*.55+time*.8;
+  const z=-4.85+crest+.09*Math.sin(wave);
+  const nx=2*crest*browX/2.8,ny=2*crest*browY/2.4-.0495*Math.cos(wave);
+  const l=Math.hypot(nx,ny,1);
   return {inside,z,nx:nx/l,ny:ny/l,nz:1/l};
 }
