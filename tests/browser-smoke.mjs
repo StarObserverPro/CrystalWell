@@ -172,6 +172,41 @@ try{
   await page.waitForTimeout(350);await shot('landscape');
   assert.equal(await page.evaluate(()=>{const q=__crystalWell,V=q.sideCamera.position.constructor;
     for(let i=0;i<128;i++){const a=i*Math.PI*2/128,p=new V(Math.cos(a)*11.9,Math.sin(a)*11.9,12.05).project(q.sideCamera);if(Math.abs(p.x)>.98||Math.abs(p.y)>.98)return false;}return true;}),true,'Full near-side rim stays inside the mobile secondary view');
+  metrics.crystalSpacing=await page.evaluate(()=>{
+    const q=window.__crystalWell,{topCamera,sideCamera,world,game}=q;
+    const vertex=sideCamera.position.clone();
+    const geometry=world.sideCrystals.geometry;
+    geometry.computeBoundingBox();
+    const {min,max}=geometry.boundingBox;
+    const corners=world.records.flatMap(({p})=>
+      [min.x,max.x].flatMap(dx=>[min.y,max.y].flatMap(dy=>[min.z,max.z].map(dz=>[p.x+dx,p.y+dy,p.z+dz]))));
+    let maxMainExtent=0,minSideGap=Infinity;
+    for(let time=0;time<240;time+=20){
+      game.time=time;q.refresh();
+      let sealTop=-Infinity,lipBottom=Infinity;
+      for(const [x,y,z] of corners){
+        vertex.set(x,y,z).project(topCamera);
+        maxMainExtent=Math.max(maxMainExtent,Math.abs(vertex.x),Math.abs(vertex.y));
+        sealTop=Math.max(sealTop,vertex.set(x,y,z).project(sideCamera).y);
+      }
+      for(const segment of world.rim.children){
+        const positions=segment.geometry.attributes.position;
+        for(let i=0;i<positions.count;i++){
+          const y=vertex.fromBufferAttribute(positions,i).applyMatrix4(segment.matrixWorld).project(sideCamera).y;
+          lipBottom=Math.min(lipBottom,y);
+        }
+      }
+      // Even a shield at the farthest reachable edge must clear the top tier in projection.
+      sideCamera.getWorldDirection(vertex).multiplyScalar(game.shieldTravelRadius+game.shieldRadius);
+      vertex.z=world.shield.position.z-.23;
+      const shieldBottom=vertex.project(sideCamera).y;
+      minSideGap=Math.min(minSideGap,(Math.min(lipBottom,shieldBottom)-sealTop)*innerHeight/2);
+    }
+    return {maxMainExtent,minSideGap};
+  });
+  assert.ok(metrics.crystalSpacing.maxMainExtent<.985,'the lowered crystals fit inside the rotating main view');
+  assert.ok(metrics.crystalSpacing.minSideGap>=27,
+    `the mobile side view needs clear air above the seal, measured ${metrics.crystalSpacing.minSideGap}px`);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   assert.equal(await page.evaluate(()=>{const q=window.__crystalWell;return Math.abs(q.sideTarget.width/q.sideTarget.height-(innerWidth-document.querySelector('#main-panel').getBoundingClientRect().width)/innerHeight)<.01;}),true,'Mobile side scene uses full height beneath the HUD');
   assert.equal(await page.evaluate(()=>{const h=window.__crystalWell.hud;return h.scoreGroup.position.x<200 &&

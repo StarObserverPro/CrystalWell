@@ -4,7 +4,7 @@ import { AdventureGame } from './gameplay.js';
 import { QUALITY, pixelRatio, sideTargetSize } from './quality.js';
 import { SculptedHUD } from './hud-3d.js';
 import { RefinedCrystalWorld as CrystalWorld } from './refined-world.js';
-import { composition,sideViewDistance } from './composition.js';
+import { composition, MAIN_FOCUS_Z, sideViewDistance } from './composition.js';
 import { viewBasis, depthHeat, FrameMeter } from './visual-math.js';
 import { MagicMotes } from './vfx.js';
 
@@ -88,7 +88,7 @@ let width = 1, height = 1, mainWidth = 1, sideWidth = 1;
 let sideHeight = 1;
 let sideFps = 18;
 let sideDistance = 40;
-const cameraTarget = new THREE.Vector3(0, 0, 5.3);
+const cameraTarget = new THREE.Vector3(0, 0, MAIN_FOCUS_Z);
 const sideFocus = new THREE.Vector3(0, 0, .3);
 const raycaster = new THREE.Raycaster();
 const shieldPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -RULES.shieldZ);
